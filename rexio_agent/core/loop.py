@@ -178,11 +178,11 @@ class AgentSession:
 
         trace = history_prompt + "\nAssistant:\n"
         step = 0
-        final_answer_tokens: List[str] = []
 
         try:
             while step < max_steps:
                 step += 1
+                # Non-streaming call — needed so stop sequences work correctly
                 response_text = self.llm.generate(
                     system_instruction=system_instruction,
                     prompt=trace,
@@ -207,25 +207,32 @@ class AgentSession:
                     yield f"data: {json.dumps(step_event)}\n\n"
                     trace += f"\nObservation: {observation}\n"
                 else:
-                    # Reached Final Answer — stream it token by token
-                    final_match = re.search(r'Final Answer:\s*(.*)', response_text, re.DOTALL)
-                    preamble = final_match.group(1).strip() if final_match else response_text.replace("Assistant:", "").strip()
+                    # No more tool calls — stream the final answer token-by-token.
+                    # Build a prompt that ends right before the answer text so the
+                    # model continues from that point in a fresh streaming call.
+                    answer_prompt = trace.rstrip() + "\nFinal Answer:"
 
-                    # Stream the preamble text we already have, then continue streaming
-                    if preamble:
-                        final_answer_tokens.append(preamble)
-                        yield f"data: {json.dumps({'type': 'token', 'text': preamble})}\n\n"
+                    final_tokens: List[str] = []
+                    for chunk in self.llm.generate_stream(
+                        system_instruction=system_instruction,
+                        prompt=answer_prompt,
+                    ):
+                        final_tokens.append(chunk)
+                        yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
 
-                    # Stream remaining tokens from a fresh LLM call if preamble was cut off
-                    # (Only needed when model stopped naturally at Final Answer marker)
-                    break
+                    final_answer = "".join(final_tokens).strip()
+                    if not final_answer:
+                        final_answer = "Sorry, I could not complete the request within the step limit."
+                        yield f"data: {json.dumps({'type': 'token', 'text': final_answer})}\n\n"
 
-            final_answer = "".join(final_answer_tokens).strip()
-            if not final_answer:
-                final_answer = "Sorry, I could not complete the request within the step limit."
-                yield f"data: {json.dumps({'type': 'token', 'text': final_answer})}\n\n"
+                    save_message(self.conversation_id, "assistant", final_answer)
+                    yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
+                    return
 
-            save_message(self.conversation_id, "assistant", final_answer)
+            # Exhausted max steps without a final answer
+            fallback = "Sorry, I could not complete the request within the step limit."
+            save_message(self.conversation_id, "assistant", fallback)
+            yield f"data: {json.dumps({'type': 'token', 'text': fallback})}\n\n"
             yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
 
         except Exception as exc:
