@@ -12,7 +12,7 @@ from rich.text import Text
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from rexio_agent.db.connection import init_db
-from rexio_agent.core.config import ENV_PATH, load_environment
+from rexio_agent.core.config import CONFIG_PATH, load_environment, save_config
 from rexio_agent.core.loop import AgentSession
 
 console = Console()
@@ -80,7 +80,7 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
     print(f"\033[1;36m? \033[1;37m{prompt_text}\033[0m \033[36m{choices[current_idx]}\033[0m")
     return choices[current_idx]
 
-def run_setup_wizard(env_path: str) -> None:
+def run_setup_wizard(config_path: str) -> None:
     """Runs an interactive CLI setup wizard to configure the API keys and models."""
     from rexio_agent.db.connection import DB_PATH
     
@@ -97,9 +97,9 @@ def run_setup_wizard(env_path: str) -> None:
     install_dir = os.path.dirname(os.path.abspath(__file__))
     
     console.print("[bold cyan]◆ Configuration Locations[/]")
-    console.print(f"  [bold]Environment File (.env):[/] {env_path}")
-    console.print(f"  [bold]Database Path (SQLite):[/]  {DB_PATH}")
-    console.print(f"  [bold]Install Directory:[/]       {install_dir}")
+    console.print(f"  [bold]Configuration File (JSON):[/] {config_path}")
+    console.print(f"  [bold]Database Path (SQLite):[/]    {DB_PATH}")
+    console.print(f"  [bold]Install Directory:[/]         {install_dir}")
     console.print()
 
     # Load existing configuration defaults if present
@@ -113,8 +113,8 @@ def run_setup_wizard(env_path: str) -> None:
     current_discord_token = ""
     current_discord_channel_id = ""
 
-    if os.path.exists(env_path):
-        load_dotenv(env_path, override=True)
+    if os.path.exists(config_path):
+        load_environment()
         current_provider = os.getenv("MODEL_PROVIDER", "").lower()
         current_model = os.getenv("MODEL_NAME", "")
         current_gemini_key = os.getenv("GEMINI_API_KEY", "")
@@ -133,7 +133,7 @@ def run_setup_wizard(env_path: str) -> None:
     }
 
     # Show active configurations
-    active_provider_label = provider_labels.get(current_provider, "none") if (os.path.exists(env_path) and current_provider) else "none"
+    active_provider_label = provider_labels.get(current_provider, "none") if (os.path.exists(config_path) and current_provider) else "none"
     active_model_label = current_model if current_model else "(not set)"
     
     console.print(f"  [bold]Current Model:[/]    {active_model_label}")
@@ -237,26 +237,20 @@ def run_setup_wizard(env_path: str) -> None:
         discord_token = Prompt.ask("Enter Discord Bot Token", default=current_discord_token)
         discord_channel_id = Prompt.ask("Enter Discord Channel ID", default=current_discord_channel_id)
 
-    # Construct file content
-    env_content = f"""# Model Configuration
-MODEL_PROVIDER={provider}
-MODEL_NAME={model_name}
-
-# API Keys
-GEMINI_API_KEY={gemini_key}
-OPENAI_API_KEY={openai_key}
-"""
-    if api_base_url:
-        env_content += f"API_BASE_URL={api_base_url}\n"
-        
-    if telegram_token:
-        env_content += f"\n# Telegram Gateway\nTELEGRAM_BOT_TOKEN={telegram_token}\nTELEGRAM_CHAT_ID={telegram_chat_id}\n"
-        
-    if discord_token:
-        env_content += f"\n# Discord Gateway\nDISCORD_BOT_TOKEN={discord_token}\nDISCORD_CHANNEL_ID={discord_channel_id}\n"
-        
-    with open(env_path, "w", encoding="utf-8") as f:
-        f.write(env_content)
+    # Construct config dictionary
+    config_dict = {
+        "MODEL_PROVIDER": provider,
+        "MODEL_NAME": model_name,
+        "GEMINI_API_KEY": gemini_key,
+        "OPENAI_API_KEY": openai_key,
+        "API_BASE_URL": api_base_url,
+        "TELEGRAM_BOT_TOKEN": telegram_token,
+        "TELEGRAM_CHAT_ID": telegram_chat_id,
+        "DISCORD_BOT_TOKEN": discord_token,
+        "DISCORD_CHANNEL_ID": discord_channel_id,
+    }
+    
+    save_config(config_dict)
         
     # 7. Print tool & configuration availability summary (matching Hermes)
     console.print("\n[bold cyan]◆ Configuration Summary[/]")
@@ -288,7 +282,7 @@ OPENAI_API_KEY={openai_key}
         
     db_status = "[bold green]✓ Initialized[/]" if os.path.exists(DB_PATH) else "[yellow]Pending Init[/]"
     console.print(f"  [bold]Local Database:[/]   {db_status}")
-    console.print("\n[bold green]🎉 Configuration saved successfully to .env![/]\n")
+    console.print("\n[bold green]🎉 Configuration saved successfully![/]\n")
 
 def run_update_wizard() -> None:
     """Updates the RexiO Agent installation by pulling the latest code and syncing package dependencies."""
@@ -381,16 +375,16 @@ def main():
             console.print("\n[bold yellow]Update cancelled.[/]")
             sys.exit(1)
 
-    env_path = ENV_PATH
+    config_path = CONFIG_PATH
     
     # Run setup wizard if configuration does not exist, if explicitly requested via 'setup' / '--setup', or if keys are empty
-    should_run_setup = not os.path.exists(env_path) or (len(sys.argv) > 1 and sys.argv[1] in ("setup", "--setup"))
+    should_run_setup = not os.path.exists(config_path) or (len(sys.argv) > 1 and sys.argv[1] in ("setup", "--setup"))
     
     if should_run_setup:
         try:
-            run_setup_wizard(env_path)
-            # Re-load env configuration
-            load_dotenv(env_path, override=True)
+            run_setup_wizard(config_path)
+            # Re-load configuration
+            load_environment()
             # If setup was explicitly requested as a CLI argument, exit after completion
             if len(sys.argv) > 1 and sys.argv[1] in ("setup", "--setup"):
                 sys.exit(0)
@@ -398,8 +392,8 @@ def main():
             console.print("\n[bold yellow]Setup cancelled.[/]")
             sys.exit(1)
 
-    if not should_run_setup and os.path.exists(env_path):
-        load_dotenv(env_path, override=True)
+    if not should_run_setup and os.path.exists(config_path):
+        load_environment()
         provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
         gemini_key = os.getenv("GEMINI_API_KEY", "")
         openai_key = os.getenv("OPENAI_API_KEY", "")
@@ -408,8 +402,8 @@ def main():
             console.print("[yellow]Warning:[/] Configuration credentials appear to be missing.")
             if select_option("Would you like to run the setup wizard now?", ["yes", "no"], default_idx=0) == "yes":
                 try:
-                    run_setup_wizard(env_path)
-                    load_dotenv(env_path, override=True)
+                    run_setup_wizard(config_path)
+                    load_environment()
                 except KeyboardInterrupt:
                     console.print("\n[bold yellow]Setup cancelled.[/]")
                     sys.exit(1)
@@ -426,7 +420,7 @@ def main():
         session = AgentSession(platform="cli", channel_id="terminal_session")
     except Exception as e:
         console.print(f"[bold red]Initialization Error:[/] {str(e)}")
-        console.print("Make sure your API keys are correctly set in the [bold].env[/] file.")
+        console.print("Make sure your API keys are correctly set in the setup configuration.")
         sys.exit(1)
         
     console.print("[bold green]Agent initialized and ready.[/]\n")
