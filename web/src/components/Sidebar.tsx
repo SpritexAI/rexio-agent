@@ -1,4 +1,4 @@
-import { Cpu, RefreshCw, Plus, MessageSquare } from 'lucide-react';
+import { Plus, MessageSquare, Inbox, Briefcase, Search, Settings, Sidebar as SidebarIcon } from 'lucide-react';
 
 interface Conversation {
   id: string;
@@ -26,74 +26,109 @@ export default function Sidebar({
   handleCreateSession,
 }: SidebarProps) {
   return (
-    <div className="w-80 flex flex-col border-r border-white/[0.06] bg-[#1f1f1e] flex-shrink-0">
-      {/* Brand Header */}
-      <div className="p-5 border-b border-white/[0.06] flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-[#8b5cf6]/20 text-[#8b5cf6] rounded-lg border border-[#8b5cf6]/30">
-            <Cpu size={22} className="animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white flex items-center">
-              Aethelis Agent <span className="text-xs text-[#8b5cf6] ml-1.5 font-mono">☤</span>
-            </h1>
-            <p className="text-[10px] text-gray-500 font-mono">PERSISTENT FRAMEWORK</p>
-          </div>
-        </div>
-        <button onClick={fetchStatus} className="text-gray-500 hover:text-white transition-colors">
-          <RefreshCw size={16} />
+    <div className="w-80 flex flex-col border-r border-white/[0.06] bg-[#1f1f1e] h-full overflow-hidden flex-shrink-0 font-sans select-none">
+      {/* Header */}
+      <div className="p-5 flex items-center justify-between flex-shrink-0">
+        <span className="text-xl font-black tracking-tight text-white flex items-center">
+          Aethelis<span className="text-[#8b5cf6] ml-0.5">.</span>
+        </span>
+        <button
+          onClick={fetchStatus}
+          title={`Sync status: ${backendStatus.status}`}
+          className="text-white opacity-60 hover:opacity-100 transition-opacity p-1.5 flex items-center justify-center cursor-pointer"
+        >
+          <SidebarIcon size={18} />
         </button>
       </div>
 
-      {/* Backend Status Banner */}
-      <div className="px-5 py-3 bg-white/[0.02] border-b border-white/[0.06] flex items-center space-x-2.5">
-        <span className={`w-2 h-2 rounded-full ${backendStatus.status === 'online' ? 'bg-green-500' : 'bg-red-500 animate-ping'}`}></span>
-        <span className="text-xs font-mono text-gray-400">
-          Backend: {backendStatus.status === 'online' ? `Online (${backendStatus.model})` : 'Offline'}
-        </span>
-      </div>
-
-      {/* Action Button */}
-      <div className="p-4">
+      {/* Navigation List */}
+      <div className="px-2.5 flex flex-col gap-0.5 flex-shrink-0">
+        {/* New Chat */}
         <button
           onClick={handleCreateSession}
-          className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-lg font-medium shadow-md shadow-[#8b5cf6]/10 hover:shadow-[#8b5cf6]/20 transition-all duration-150 active:scale-[0.98]"
+          className="w-full bg-transparent border-0 rounded-xl py-2 px-3 flex items-center gap-3 text-[#b4b4b0] hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer text-left"
         >
-          <Plus size={18} />
-          <span>New Session</span>
+          <Plus size={18} strokeWidth={2.5} />
+          <span className="text-sm font-bold">New chat</span>
+        </button>
+
+        {/* Chats */}
+        <button
+          onClick={() => {}}
+          className="w-full bg-transparent border-0 rounded-xl py-2 px-3 flex items-center gap-3 text-white bg-white/[0.04] transition-all cursor-pointer text-left"
+        >
+          <MessageSquare size={16} />
+          <span className="text-sm">Chats</span>
+        </button>
+
+        {/* Projects */}
+        <button
+          onClick={() => alert('Projects are locked to Workspace configurations.')}
+          className="w-full bg-transparent border-0 rounded-xl py-2 px-3 flex items-center gap-3 text-[#b4b4b0] hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer text-left"
+        >
+          <Inbox size={16} />
+          <span className="text-sm">Projects</span>
+        </button>
+
+        {/* Customize */}
+        <button
+          onClick={() => {}}
+          className="w-full bg-transparent border-0 rounded-xl py-2 px-3 flex items-center gap-3 text-[#b4b4b0] hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer text-left"
+        >
+          <Briefcase size={16} />
+          <span className="text-sm">Customize</span>
         </button>
       </div>
 
-      {/* Sessions List */}
-      <div className="flex-1 overflow-y-auto px-3 space-y-1.5">
-        <p className="text-xs font-semibold text-gray-500 px-2.5 uppercase tracking-wider mb-2">Sessions History</p>
+      {/* Recents Header */}
+      <div className="flex items-center justify-between px-5 pt-5 pb-1.5 flex-shrink-0">
+        <span className="text-xs font-semibold text-[#52525b] uppercase tracking-wider">Recents</span>
+        <Search size={14} className="text-[#52525b] hover:text-white cursor-pointer transition-colors" />
+      </div>
+
+      {/* Sessions list */}
+      <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5 custom-scrollbar">
         {conversations.length === 0 ? (
-          <div className="text-center py-8 text-sm text-gray-600">No active sessions</div>
+          <div className="text-center py-8 text-xs text-[#52525b]">No chats yet</div>
         ) : (
-          conversations.map((conv) => (
-            <div
-              key={conv.id}
-              onClick={() => setActiveConvId(conv.id)}
-              className={`flex items-start space-x-3 p-3 rounded-lg cursor-pointer transition-all duration-150 group border ${
-                activeConvId === conv.id
-                  ? 'bg-white/[0.08] border-white/[0.12] text-white'
-                  : 'bg-transparent border-transparent hover:bg-white/[0.04] text-[#b4b4b0] hover:text-white'
-              }`}
-            >
-              <MessageSquare size={18} className="mt-0.5 flex-shrink-0 text-[#8b5cf6] group-hover:text-[#a78bfa]" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-mono font-medium truncate">{conv.id}</p>
-                <p className="text-xs text-[#8a8a85] truncate mt-0.5">{conv.summary || 'No summary available.'}</p>
-              </div>
-            </div>
-          ))
+          conversations.map((conv) => {
+            const isActive = activeConvId === conv.id;
+            return (
+              <button
+                key={conv.id}
+                onClick={() => setActiveConvId(conv.id)}
+                className={`w-full text-left truncate block py-2 px-4 rounded-xl text-sm transition-all border cursor-pointer ${
+                  isActive
+                    ? 'bg-white/[0.08] border-white/[0.12] text-white font-semibold'
+                    : 'bg-transparent border-transparent hover:bg-white/[0.04] text-[#b4b4b0] hover:text-white'
+                }`}
+              >
+                {conv.summary || conv.id}
+              </button>
+            );
+          })
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-[#8a8a85] font-mono">
-        <span>v0.1.0 (Beta)</span>
-        <span>Nous Standard</span>
+      {/* User Profile Footer */}
+      <div className="border-t border-white/[0.05] p-4 flex-shrink-0">
+        <div className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl p-3 flex items-center gap-3">
+          {/* Avatar (Left) */}
+          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#8b5cf6] to-[#d946ef] flex items-center justify-center font-bold text-white text-sm flex-shrink-0 select-none">
+            S
+          </div>
+
+          {/* Name and Metadata (Middle) */}
+          <div className="flex-1 min-w-0 text-left">
+            <p className="margin-0 font-semibold text-sm text-gray-200 truncate leading-tight">Sijan</p>
+            <p className="margin-0 text-[11px] text-[#8a8a85] truncate mt-0.5">Developer plan</p>
+          </div>
+
+          {/* Settings button (Right) */}
+          <button className="bg-none border-0 text-[#52525b] hover:text-white cursor-pointer p-1 flex items-center justify-center transition-colors flex-shrink-0">
+            <Settings size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
