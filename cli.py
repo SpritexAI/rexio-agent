@@ -600,12 +600,164 @@ def run_update_wizard() -> None:
             except Exception as e:
                 console.print(f"[bold red]✗ Failed to build web frontend:[/] {str(e)}")
 
+        # Restart systemd service — try system-level first, then user-level
+        console.print("\n🔁 [yellow]Restarting RexiO service...[/]")
+        try:
+            # System-level (VPS, sudo)
+            sys_result = subprocess.run(
+                ["sudo", "systemctl", "restart", "rexio.service"],
+                capture_output=True, text=True, timeout=15
+            )
+            if sys_result.returncode == 0:
+                console.print("[bold green]✓ System service restarted.[/]")
+            else:
+                # Fall back to user-level
+                usr_result = subprocess.run(
+                    ["systemctl", "--user", "restart", "rexio.service"],
+                    capture_output=True, text=True
+                )
+                if usr_result.returncode == 0:
+                    console.print("[bold green]✓ User service restarted.[/]")
+                else:
+                    console.print("[yellow]⚠ Could not restart service — run manually.[/]")
+        except Exception:
+            console.print("[yellow]⚠ systemd not available — skipping restart.[/]")
+
         console.print("\n[bold green]🎉 RexiO Agent update complete![/]\n")
     except subprocess.CalledProcessError as e:
         console.print("[bold red]✗ Failed to compile and install package dependencies.[/]")
         sys.exit(1)
 
+def run_gateway_install():
+    """Installs RexiO as a system-level service (/etc/systemd/system/).
+    Runs with sudo so it stays alive after SSH disconnect and auto-starts on VPS reboot.
+    """
+    import subprocess
+    import shutil
+    import getpass
+    import pwd
+
+    install_dir = os.path.dirname(os.path.abspath(__file__))
+    python_path = os.path.join(install_dir, ".venv", "bin", "python")
+    username = getpass.getuser()
+    home_dir = os.path.expanduser("~")
+    env_file = os.path.join(install_dir, ".env")
+    log_dir = os.path.join(os.path.dirname(install_dir), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Detect group
+    try:
+        group_name = pwd.getpwnam(username).pw_name
+    except Exception:
+        group_name = username
+
+    console.print()
+    console.print("[bold cyan]┌─────────────────────────────────────────────────────────┐[/]")
+    console.print("[bold cyan]│            ☤ RexiO Gateway Install                     │[/]")
+    console.print("[bold cyan]├─────────────────────────────────────────────────────────┤[/]")
+    console.print("[bold cyan]│  Installing system-level service (requires sudo)        │[/]")
+    console.print("[bold cyan]│  Stays alive after SSH disconnect, auto-starts on boot  │[/]")
+    console.print("[bold cyan]└─────────────────────────────────────────────────────────┘[/]")
+    console.print()
+
+    service_name = "rexio"
+    service_path = f"/etc/systemd/system/{service_name}.service"
+
+    service_content = f"""[Unit]
+Description=RexiO Agent Gateway
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={username}
+Group={group_name}
+WorkingDirectory={install_dir}
+ExecStart={python_path} run_agent.py
+EnvironmentFile={env_file}
+Environment="HOME={home_dir}"
+Environment="USER={username}"
+Environment="LOGNAME={username}"
+Environment="REXIO_DEV=0"
+Restart=always
+RestartSec=5
+RestartMaxDelaySec=300
+KillMode=mixed
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+    # Write service file via sudo
+    console.print(f"📝 [yellow]Writing service file to {service_path}...[/]")
+    try:
+        write_cmd = f"echo {repr(service_content)} | sudo tee {service_path} > /dev/null"
+        result = subprocess.run(write_cmd, shell=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            # Try alternative approach
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.service', delete=False) as tmp:
+                tmp.write(service_content)
+                tmp_path = tmp.name
+            subprocess.run(["sudo", "cp", tmp_path, service_path], check=True)
+            subprocess.run(["sudo", "chmod", "644", service_path], check=True)
+            os.unlink(tmp_path)
+        console.print(f"[bold green]✓ Service file written.[/]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]✗ Failed to write service file:[/] {e}")
+        sys.exit(1)
+
+    # Disable old user-level service if exists
+    user_service = os.path.expanduser("~/.config/systemd/user/rexio.service")
+    if os.path.exists(user_service):
+        console.print("🔄 [yellow]Disabling old user-level service...[/]")
+        subprocess.run(["systemctl", "--user", "stop", "rexio.service"], capture_output=True)
+        subprocess.run(["systemctl", "--user", "disable", "rexio.service"], capture_output=True)
+
+    # Reload + enable + start
+    console.print("⚙️  [yellow]Enabling and starting system service...[/]")
+    try:
+        subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+        subprocess.run(["sudo", "systemctl", "enable", service_name], check=True)
+        subprocess.run(["sudo", "systemctl", "restart", service_name], check=True)
+        console.print(f"[bold green]✓ RexiO service enabled and started.[/]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]✗ systemctl failed:[/] {e}")
+        sys.exit(1)
+
+    # Show status
+    import time
+    time.sleep(2)
+    status = subprocess.run(
+        ["sudo", "systemctl", "status", service_name, "--no-pager", "-l"],
+        capture_output=True, text=True
+    )
+    active_line = next((l for l in status.stdout.splitlines() if "Active:" in l), "")
+    if "active (running)" in active_line:
+        console.print(f"\n[bold green]🎉 RexiO gateway is live![/]")
+        console.print(f"   Logs:    [cyan]journalctl -u {service_name} -f[/]")
+        console.print(f"   Status:  [cyan]sudo systemctl status {service_name}[/]")
+        console.print(f"   Restart: [cyan]sudo systemctl restart {service_name}[/]\n")
+    else:
+        console.print(f"\n[yellow]⚠ Service may not be running. Check:[/]")
+        console.print(f"   [cyan]sudo systemctl status {service_name}[/]")
+        console.print(f"   [cyan]journalctl -u {service_name} -n 30[/]\n")
+
+
 def main():
+    # gateway install
+    if len(sys.argv) > 2 and sys.argv[1] == "gateway" and sys.argv[2] == "install":
+        try:
+            run_gateway_install()
+            sys.exit(0)
+        except KeyboardInterrupt:
+            console.print("\n[bold yellow]Install cancelled.[/]")
+            sys.exit(1)
+
     # 1. Check for update request
     if len(sys.argv) > 1 and sys.argv[1] in ("update", "--update"):
         try:
