@@ -23,11 +23,26 @@ from rexio_agent.db.connection import (
 )
 from rexio_agent.core.loop import AgentSession
 
-# Database initialization on startup
+# Database and Gateway initialization on startup
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    
+    # Start Telegram gateway in the background if token is configured
+    telegram_task = None
+    if os.getenv("TELEGRAM_BOT_TOKEN"):
+        from rexio_agent.gateway.telegram import run_telegram_bot
+        telegram_task = asyncio.create_task(run_telegram_bot())
+        
     yield
+    
+    # Clean up tasks on shutdown
+    if telegram_task:
+        telegram_task.cancel()
+        try:
+            await telegram_task
+        except asyncio.CancelledError:
+            pass
 
 app = FastAPI(title="RexiO Agent API", lifespan=lifespan)
 
