@@ -20,7 +20,7 @@ interface Conversation {
 }
 
 const BACKEND_URL = window.location.port === '5173'
-  ? 'http://localhost:8000'
+  ? 'http://localhost:51730'
   : window.location.origin;
 
 export default function App() {
