@@ -75,6 +75,17 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* ── RexiO Icon Animations ── */
+@keyframes rexio-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes rexio-pulse-scale {
+  0%, 100% { transform: scale(0.88); }
+  50%       { transform: scale(1); }
+}
+
 /* ── MessageBubble Markdown / Text Styling ── */
 .rexio-user-content {
   font-size: var(--bubble-font-user) !important;
