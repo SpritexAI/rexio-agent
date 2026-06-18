@@ -1,4 +1,4 @@
--- SQLite schema for Aethelis Agent
+-- SQLite schema for RexiO Agent
 
 -- Conversations table to track interactive sessions
 CREATE TABLE IF NOT EXISTS conversations (

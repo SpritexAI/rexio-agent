@@ -11,13 +11,13 @@ from typing import List, Dict, Any
 # Ensure codebase package is on python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from aethelis.db.connection import (
+from rexio_agent.db.connection import (
     init_db,
     get_skills,
     get_messages,
     get_db_connection
 )
-from aethelis.core.loop import AgentSession
+from rexio_agent.core.loop import AgentSession
 
 # Database initialization on startup
 @asynccontextmanager
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
-app = FastAPI(title="Aethelis Agent API", lifespan=lifespan)
+app = FastAPI(title="RexiO Agent API", lifespan=lifespan)
 
 # Configure CORS for frontend access
 app.add_middleware(

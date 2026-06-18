@@ -1,9 +1,9 @@
 import inspect
 from typing import Dict, Any, Callable, List, Optional
-from aethelis.tools.file_tools import read_file, write_file, list_directory
-from aethelis.tools.web_tools import search_web
-from aethelis.tools.executor import execute_python_code
-from aethelis.db.connection import get_skills
+from rexio_agent.tools.file_tools import read_file, write_file, list_directory
+from rexio_agent.tools.web_tools import search_web
+from rexio_agent.tools.executor import execute_python_code
+from rexio_agent.db.connection import get_skills
 
 # Built-in tools registry
 BUILTIN_TOOLS: Dict[str, Callable] = {
@@ -75,7 +75,7 @@ class ToolRegistry:
         if not execution_log:
             return "Error: No execution log found for this session."
         
-        from aethelis.core.skills_compiler import SkillCompiler
+        from rexio_agent.core.skills_compiler import SkillCompiler
         compiler = SkillCompiler()
         skill_name = compiler.compile_and_save(task_description, execution_log)
         

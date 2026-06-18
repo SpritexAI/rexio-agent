@@ -24,7 +24,7 @@ export default function SkillsHub({ skills, setSelectedSkill }: SkillsHubProps) 
       {/* Banner */}
       <div className="p-4 bg-[#8b5cf6]/5 border-b border-white/[0.06]">
         <p className="text-xs text-[#a78bfa] leading-relaxed font-sans">
-          Aethelis dynamically compiles successful agent workflows into reusable Python functions and registers them as real-time tools.
+          RexiO Agent dynamically compiles successful agent workflows into reusable Python functions and registers them as real-time tools.
         </p>
       </div>
 

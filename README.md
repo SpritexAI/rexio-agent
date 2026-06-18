@@ -1,6 +1,6 @@
-# Aethelis Agent ☤
+# RexiO Agent ☤
 
-Aethelis Agent is a self-improving, persistent AI agent framework. It uses a hybrid Python and TypeScript architecture, allowing it to perform backend execution, run cron routines, learn skills dynamically, and stream updates to chat clients or a web-based dashboard.
+RexiO Agent is a self-improving, persistent AI agent framework. It uses a hybrid Python and TypeScript architecture, allowing it to perform backend execution, run cron routines, learn skills dynamically, and stream updates to chat clients or a web-based dashboard.
 
 ## Features
 

@@ -105,9 +105,9 @@ export default function ChatContainer({
               <div className="p-4 bg-[#8b5cf6]/10 text-[#8b5cf6] rounded-full border border-[#8b5cf6]/10 mb-4 animate-bounce">
                 <Cpu size={36} />
               </div>
-              <h3 className="text-lg font-semibold text-white">Ask Aethelis Agent anything</h3>
+              <h3 className="text-lg font-semibold text-white">Ask RexiO Agent anything</h3>
               <p className="text-sm text-[#8a8a85] mt-2">
-                Aethelis will research files, browse the web, execute scripts, and compile new tools as it goes.
+                RexiO Agent will research files, browse the web, execute scripts, and compile new tools as it goes.
               </p>
             </div>
           ) : (

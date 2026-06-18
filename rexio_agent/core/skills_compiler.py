@@ -1,8 +1,8 @@
 import os
 import re
 from typing import List, Dict, Any, Tuple, Optional
-from aethelis.core.llm import LlmClient
-from aethelis.db.connection import save_skill
+from rexio_agent.core.llm import LlmClient
+from rexio_agent.db.connection import save_skill
 
 SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills")
 

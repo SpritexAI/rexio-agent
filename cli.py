@@ -8,11 +8,11 @@ from rich.prompt import Prompt
 from rich.panel import Panel
 from rich.text import Text
 
-# Add workspace to python path so aethelis can be imported directly
+# Add workspace to python path so rexio_agent can be imported directly
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from aethelis.db.connection import init_db
-from aethelis.core.loop import AgentSession
+from rexio_agent.db.connection import init_db
+from rexio_agent.core.loop import AgentSession
 
 console = Console()
 
@@ -81,7 +81,7 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
 
 def run_setup_wizard(env_path: str) -> None:
     """Runs an interactive CLI setup wizard to configure the API keys and models."""
-    console.print(Panel(Text("Aethelis Agent Setup Wizard ☤", style="bold cyan"), title="System Setup"))
+    console.print(Panel(Text("RexiO Agent Setup Wizard ☤", style="bold cyan"), title="System Setup"))
     console.print("Let's configure your environment. This will create or update your local [yellow].env[/] file.\n")
     
     # 1. LLM Provider (rendered as a dropdown)
@@ -158,7 +158,7 @@ OPENAI_API_KEY={openai_key}
     console.print("\n[bold green]Configuration saved successfully to .env![/]\n")
 
 def main():
-    console.print(Panel(Text("Welcome to Aethelis Agent ☤\nType 'exit' or 'quit' to end the session.", style="bold cyan", justify="center")))
+    console.print(Panel(Text("Welcome to RexiO Agent ☤\nType 'exit' or 'quit' to end the session.", style="bold cyan", justify="center")))
     
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     
@@ -216,7 +216,7 @@ def main():
             with console.status("[bold cyan]Agent is thinking...[/]"):
                 response = session.run(user_msg)
                 
-            console.print(Panel(Text(response, style="white"), title="Aethelis"))
+            console.print(Panel(Text(response, style="white"), title="RexiO"))
             console.print()
             
         except KeyboardInterrupt:

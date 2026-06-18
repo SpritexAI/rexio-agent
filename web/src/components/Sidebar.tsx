@@ -30,7 +30,7 @@ export default function Sidebar({
       {/* Header */}
       <div className="p-5 flex items-center justify-between flex-shrink-0">
         <span className="text-xl font-black tracking-tight text-white flex items-center">
-          Aethelis<span className="text-[#8b5cf6] ml-0.5">.</span>
+          RexiO Agent<span className="text-[#8b5cf6] ml-0.5">.</span>
         </span>
         <button
           onClick={fetchStatus}

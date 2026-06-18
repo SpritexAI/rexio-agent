@@ -6,13 +6,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from aethelis.core.llm import LlmClient
-from aethelis.tools.registry import ToolRegistry
-from aethelis.db.connection import save_conversation, save_message, get_messages
+from rexio_agent.core.llm import LlmClient
+from rexio_agent.tools.registry import ToolRegistry
+from rexio_agent.db.connection import save_conversation, save_message, get_messages
 
 console = Console()
 
-SYSTEM_INSTRUCTION_TEMPLATE = """You are Aethelis Agent, an advanced, self-improving, persistent AI agent framework. 
+SYSTEM_INSTRUCTION_TEMPLATE = """You are RexiO Agent, an advanced, self-improving, persistent AI agent framework. 
 You think steps through, select tools to interact with the system or search the web, learn from results, and compile reusable functions.
 
 You must follow the ReAct flow:
