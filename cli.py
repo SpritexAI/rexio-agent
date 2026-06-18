@@ -18,8 +18,10 @@ from rexio_agent.core.loop import AgentSession
 console = Console()
 
 def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
-    """Helper to render a beautiful arrow-key based selection list in terminal."""
-    sys.stdout.write(f"\033[1;36m? \033[1;37m{prompt_text}\033[0m\n")
+    """Helper to render a beautiful arrow-key based selection list in terminal, matching Hermes TUI."""
+    # Print header
+    sys.stdout.write(f"\033[1;33mSelect {prompt_text.replace('Select ', '')}:\033[0m\n")
+    sys.stdout.write("  \033[2m↑↓ navigate  ENTER/SPACE select  Ctrl+C exit\033[0m\n\n")
     sys.stdout.flush()
     current_idx = default_idx
     
@@ -32,9 +34,11 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
             # Print choices
             for i, choice in enumerate(choices):
                 if i == current_idx:
-                    sys.stdout.write(f"  \033[36m❯ {choice}\033[0m\n")
+                    # Selected: Green arrow ➔, filled circle (●), and bold green text
+                    sys.stdout.write(f"\033[1;32m➔ (●) {choice}\033[0m\n")
                 else:
-                    sys.stdout.write(f"    {choice}\n")
+                    # Unselected: empty circle (o) and normal text
+                    sys.stdout.write(f"   (o) {choice}\n")
                     
             # Move cursor back to the top of the choices list
             sys.stdout.write(f"\033[{len(choices)}A")
@@ -53,7 +57,7 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
                         current_idx = (current_idx - 1) % len(choices)
                     elif char3 == 'B':  # Down
                         current_idx = (current_idx + 1) % len(choices)
-                elif char in ('\r', '\n'):
+                elif char in ('\r', '\n', ' '): # Enter or Space
                     break
                 elif char == '\x03':  # Ctrl+C
                     raise KeyboardInterrupt()
@@ -70,14 +74,16 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
         # Show cursor and clean options
         for _ in range(len(choices)):
             sys.stdout.write("\033[K\n")
-        # Move up to prompt header
-        sys.stdout.write(f"\033[{len(choices) + 1}A")
-        sys.stdout.write("\033[K")
+        # Move up to prompt header (header has 3 lines: prompt_text, guide, empty line)
+        sys.stdout.write(f"\033[{len(choices) + 3}A")
+        sys.stdout.write("\033[K\n\033[K\n\033[K")
+        sys.stdout.write("\033[2A") # Move back to the first line
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
         
     # Print final selected answer on the same line as the prompt
-    print(f"\033[1;36m? \033[1;37m{prompt_text}\033[0m \033[36m{choices[current_idx]}\033[0m")
+    clean_choice = choices[current_idx].split("  ←")[0]
+    print(f"\033[1;33mSelect {prompt_text.replace('Select ', '')}:\033[0m \033[1;32m{clean_choice}\033[0m\n")
     return choices[current_idx]
 
 def run_setup_wizard(config_path: str) -> None:
@@ -126,9 +132,9 @@ def run_setup_wizard(config_path: str) -> None:
         current_discord_channel_id = os.getenv("DISCORD_CHANNEL_ID", "")
 
     provider_labels = {
-        "gemini": "Google Gemini",
-        "openai": "OpenAI",
-        "openrouter": "OpenRouter",
+        "gemini": "Google Gemini (Gemini models - native Gemini API)",
+        "openai": "OpenAI (GPT-4o, o1, and compatible models)",
+        "openrouter": "OpenRouter (100+ models, pay-per-use)",
         "custom": "Custom Endpoint (Local / Ollama / Custom API)"
     }
 
@@ -147,7 +153,7 @@ def run_setup_wizard(config_path: str) -> None:
     
     for i, p in enumerate(provider_choices):
         label = provider_labels[p]
-        if p == current_provider and os.path.exists(env_path):
+        if p == current_provider and os.path.exists(config_path):
             display_choices.append(f"{label}  ← currently active")
             default_provider_idx = i
         else:
