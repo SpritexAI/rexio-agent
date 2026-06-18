@@ -586,6 +586,18 @@ def main():
             console.print("\n[bold yellow]Update cancelled.[/]")
             sys.exit(1)
 
+    # 1b. Check for backend server request
+    if len(sys.argv) > 1 and sys.argv[1] in ("server", "web", "start"):
+        try:
+            import run_agent
+            run_agent.start()
+            sys.exit(0)
+        except KeyboardInterrupt:
+            sys.exit(0)
+        except Exception as e:
+            console.print(f"[bold red]Failed to start server:[/] {str(e)}")
+            sys.exit(1)
+
     config_path = CONFIG_PATH
     
     # Run setup wizard if configuration does not exist, if explicitly requested via 'setup' / '--setup', or if keys are empty
