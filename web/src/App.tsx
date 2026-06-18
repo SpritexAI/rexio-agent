@@ -124,12 +124,9 @@ export default function App() {
     // Optimistically append user message
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
 
-    // Placeholder for streaming assistant reply
+    // Track whether the assistant message row has been created yet
     const streamingIndex = { current: -1 };
-    setMessages((prev) => {
-      streamingIndex.current = prev.length;
-      return [...prev, { role: 'assistant', content: '' }];
-    });
+    let firstToken = true;
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/chat/stream`, {
@@ -168,16 +165,24 @@ export default function App() {
             const event = JSON.parse(raw);
 
             if (event.type === 'token') {
-              // Drop the thinking indicator the moment text begins streaming
-              setIsThinking(false);
-              setMessages((prev) => {
-                const updated = [...prev];
-                const idx = streamingIndex.current;
-                if (idx >= 0 && updated[idx]) {
-                  updated[idx] = { ...updated[idx], content: updated[idx].content + event.text };
-                }
-                return updated;
-              });
+              if (firstToken) {
+                // Hide thinking icon and create the assistant message row on first token only
+                firstToken = false;
+                setIsThinking(false);
+                setMessages((prev) => {
+                  streamingIndex.current = prev.length;
+                  return [...prev, { role: 'assistant', content: event.text }];
+                });
+              } else {
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const idx = streamingIndex.current;
+                  if (idx >= 0 && updated[idx]) {
+                    updated[idx] = { ...updated[idx], content: updated[idx].content + event.text };
+                  }
+                  return updated;
+                });
+              }
             } else if (event.type === 'step') {
               setActiveStepLog((prev) => [...prev, event]);
             } else if (event.type === 'done') {
@@ -186,22 +191,22 @@ export default function App() {
             } else if (event.type === 'error') {
               throw new Error(event.message);
             }
-          } catch {
-            // Non-JSON line, skip
+          } catch (parseErr: any) {
+            if (parseErr?.message && !parseErr.message.includes('JSON')) throw parseErr;
           }
         }
       }
     } catch (err: any) {
       console.error('Stream error:', err);
-      setMessages((prev) => {
-        // Remove empty streaming placeholder if it exists
-        const updated = prev.filter((m, i) => !(i === streamingIndex.current && m.content === ''));
-        return [...updated, { role: 'system', content: `Error: ${err.message || 'Could not reach agent backend.'}` }];
-      });
+      setMessages((prev) => [
+        ...prev,
+        { role: 'system', content: `Error: ${err.message || 'Could not reach agent backend.'}` },
+      ]);
     } finally {
       setIsThinking(false);
     }
   };
+
 
 
   return (
