@@ -161,7 +161,7 @@ export default function ChatContainer({
           {isThinking && (
             <div className="flex flex-col items-start mb-6 px-1 w-full">
               <div
-                className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none mb-2"
+                className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none"
                 style={{ animation: 'rexio-pulse-scale 0.8s ease-in-out infinite' }}
               >
                 <img
@@ -170,15 +170,6 @@ export default function ChatContainer({
                   className="w-7 h-7"
                   style={{ animation: 'rexio-spin 2s linear infinite' }}
                 />
-              </div>
-
-              <div className="flex items-center space-x-3 bg-white/[0.03] border border-white/[0.08] text-gray-200 rounded-2xl rounded-tl-sm py-3 px-4 max-w-md">
-                <div className="flex space-x-1.5">
-                  <div className="w-2 h-2 bg-[#8b5cf6] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-[#8b5cf6] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-[#8b5cf6] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-                <span className="text-xs text-gray-500 font-mono animate-pulse">Running agent reasoning loop...</span>
               </div>
             </div>
           )}
