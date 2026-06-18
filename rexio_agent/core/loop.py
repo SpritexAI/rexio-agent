@@ -2,6 +2,7 @@ import re
 import ast
 import json
 import uuid
+import os
 from typing import Dict, Any, Generator, List, Tuple, Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -10,6 +11,22 @@ from rich.text import Text
 from rexio_agent.core.llm import LlmClient
 from rexio_agent.tools.registry import ToolRegistry
 from rexio_agent.db.connection import save_conversation, save_message, update_message_steps, get_messages
+
+SOUL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SOUL.md")
+
+def load_soul() -> str:
+    """Loads SOUL.md persona file, strips HTML comments, returns persona text."""
+    try:
+        with open(SOUL_PATH, "r", encoding="utf-8") as f:
+            raw = f.read()
+        import re as _re
+        # Strip HTML comments
+        raw = _re.sub(r'<!--.*?-->', '', raw, flags=_re.DOTALL)
+        # Strip markdown heading
+        raw = _re.sub(r'^#.*\n', '', raw)
+        return raw.strip()
+    except FileNotFoundError:
+        return ""
 
 console = Console()
 
@@ -113,11 +130,12 @@ class AgentSession:
         
         # Prepare system instruction
         from datetime import datetime
+        soul = load_soul()
         markdown_context = self.registry.get_markdown_context()
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
             tool_definitions=self.registry.get_tool_definitions(),
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
-        ) + markdown_context
+        ) + (f"\n\n## Persona\n{soul}" if soul else "") + markdown_context
         
         # Start ReAct trace
         trace = history_prompt + "\nAssistant:\n"
@@ -199,11 +217,12 @@ class AgentSession:
         history_prompt += f"User: {user_input}\n"
 
         from datetime import datetime
+        soul = load_soul()
         markdown_context = self.registry.get_markdown_context()
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
             tool_definitions=self.registry.get_tool_definitions(),
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
-        ) + markdown_context
+        ) + (f"\n\n## Persona\n{soul}" if soul else "") + markdown_context
 
         trace = history_prompt + "\nAssistant:\n"
         step = 0
