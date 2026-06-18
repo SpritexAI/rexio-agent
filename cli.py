@@ -102,7 +102,7 @@ def run_setup_wizard(env_path: str) -> None:
     console.print()
 
     # Load existing configuration defaults if present
-    current_provider = "gemini"
+    current_provider = ""
     current_model = ""
     current_gemini_key = ""
     current_openai_key = ""
@@ -114,7 +114,7 @@ def run_setup_wizard(env_path: str) -> None:
 
     if os.path.exists(env_path):
         load_dotenv(env_path, override=True)
-        current_provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
+        current_provider = os.getenv("MODEL_PROVIDER", "").lower()
         current_model = os.getenv("MODEL_NAME", "")
         current_gemini_key = os.getenv("GEMINI_API_KEY", "")
         current_openai_key = os.getenv("OPENAI_API_KEY", "")
@@ -132,7 +132,7 @@ def run_setup_wizard(env_path: str) -> None:
     }
 
     # Show active configurations
-    active_provider_label = provider_labels.get(current_provider, current_provider) if os.path.exists(env_path) else "none"
+    active_provider_label = provider_labels.get(current_provider, "none") if (os.path.exists(env_path) and current_provider) else "none"
     active_model_label = current_model if current_model else "(not set)"
     
     console.print(f"  [bold]Current Model:[/]    {active_model_label}")
