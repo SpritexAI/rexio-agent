@@ -317,8 +317,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
 
             elif event["type"] == "thinking":
+                thought = event.get("thought", "")
                 label = tool_label(event.get("tool", ""), event.get("args", ""))
-                current_action = f"⏳ {label}..."
+                if thought:
+                    short = thought.strip().splitlines()[0][:80]
+                    current_action = f"💭 {short}\n⏳ {label}..."
+                else:
+                    current_action = f"⏳ {label}..."
                 await safe_edit(build_status(current_action=current_action))
 
             elif event["type"] == "step":
