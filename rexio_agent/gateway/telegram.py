@@ -62,7 +62,24 @@ def tool_label(tool: str, args: str) -> str:
         path = parsed.get("path", "")
         return f"📁 Listing `{path}`" if path else "📁 Listing directory"
 
-    return TOOL_LABELS.get(tool, f"🔧 {tool.replace('_', ' ').capitalize()}")
+    if tool == "memory":
+        action = parsed.get("action", "")
+        target = parsed.get("target", "")
+        content = (parsed.get("content") or "")[:40]
+        if action == "add":
+            return f"🧠 Saving to {target}: {content}..."
+        if action == "replace":
+            return f"🧠 Updating {target}: {content}..."
+        if action == "remove":
+            return f"🧠 Removing from {target}: {content}..."
+        return "🧠 Memory update"
+
+    if tool == "save_recent_workflow_as_tool":
+        desc = parsed.get("task_description", "")[:50]
+        return f"💾 Compiling skill: {desc}" if desc else "💾 Compiling skill"
+
+    # Compiled / custom skill — show tool name nicely
+    return f"🔧 {tool.replace('_', ' ').title()}"
 
 
 async def skills_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
