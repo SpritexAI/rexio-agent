@@ -1,5 +1,7 @@
 import os
 import sys
+import tty
+import termios
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.prompt import Prompt
@@ -14,17 +16,76 @@ from aethelis.core.loop import AgentSession
 
 console = Console()
 
+def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
+    """Helper to render a beautiful arrow-key based selection list in terminal."""
+    sys.stdout.write(f"\033[1;36m? \033[1;37m{prompt_text}\033[0m\n")
+    sys.stdout.flush()
+    current_idx = default_idx
+    
+    # Hide cursor
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+    
+    try:
+        while True:
+            # Print choices
+            for i, choice in enumerate(choices):
+                if i == current_idx:
+                    sys.stdout.write(f"  \033[36m❯ {choice}\033[0m\n")
+                else:
+                    sys.stdout.write(f"    {choice}\n")
+                    
+            # Move cursor back to the top of the choices list
+            sys.stdout.write(f"\033[{len(choices)}A")
+            sys.stdout.flush()
+            
+            # Read character
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                char = sys.stdin.read(1)
+                if char == '\x1b':  # Arrow key sequence prefix
+                    char2 = sys.stdin.read(1)
+                    char3 = sys.stdin.read(1)
+                    if char3 == 'A':  # Up
+                        current_idx = (current_idx - 1) % len(choices)
+                    elif char3 == 'B':  # Down
+                        current_idx = (current_idx + 1) % len(choices)
+                elif char in ('\r', '\n'):
+                    break
+                elif char == '\x03':  # Ctrl+C
+                    raise KeyboardInterrupt()
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                
+            # Clear lines for redraw
+            for _ in range(len(choices)):
+                sys.stdout.write("\033[K\n")
+            sys.stdout.write(f"\033[{len(choices)}A")
+            sys.stdout.flush()
+            
+    finally:
+        # Show cursor and clean options
+        for _ in range(len(choices)):
+            sys.stdout.write("\033[K\n")
+        # Move up to prompt header
+        sys.stdout.write(f"\033[{len(choices) + 1}A")
+        sys.stdout.write("\033[K")
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        
+    # Print final selected answer on the same line as the prompt
+    print(f"\033[1;36m? \033[1;37m{prompt_text}\033[0m \033[36m{choices[current_idx]}\033[0m")
+    return choices[current_idx]
+
 def run_setup_wizard(env_path: str) -> None:
     """Runs an interactive CLI setup wizard to configure the API keys and models."""
     console.print(Panel(Text("Aethelis Agent Setup Wizard ☤", style="bold cyan"), title="System Setup"))
     console.print("Let's configure your environment. This will create or update your local [yellow].env[/] file.\n")
     
-    # 1. LLM Provider
-    provider = Prompt.ask(
-        "Select LLM Provider", 
-        choices=["gemini", "openai", "openrouter", "custom"], 
-        default="gemini"
-    ).lower()
+    # 1. LLM Provider (rendered as a dropdown)
+    provider = select_option("Select LLM Provider", ["gemini", "openai", "openrouter", "custom"])
     
     # 2. Model Name
     if provider == "gemini":
@@ -60,16 +121,16 @@ def run_setup_wizard(env_path: str) -> None:
     # 4. Telegram Gateway Integration
     telegram_token = ""
     telegram_chat_id = ""
-    configure_telegram = Prompt.ask("Do you want to configure Telegram Bot Gateway?", choices=["y", "n"], default="n")
-    if configure_telegram == "y":
+    configure_telegram = select_option("Do you want to configure Telegram Bot Gateway?", ["yes", "no"], default_idx=1)
+    if configure_telegram == "yes":
         telegram_token = Prompt.ask("Enter Telegram Bot Token")
         telegram_chat_id = Prompt.ask("Enter Telegram Chat ID")
 
     # 5. Discord Gateway Integration
     discord_token = ""
     discord_channel_id = ""
-    configure_discord = Prompt.ask("Do you want to configure Discord Bot Gateway?", choices=["y", "n"], default="n")
-    if configure_discord == "y":
+    configure_discord = select_option("Do you want to configure Discord Bot Gateway?", ["yes", "no"], default_idx=1)
+    if configure_discord == "yes":
         discord_token = Prompt.ask("Enter Discord Bot Token")
         discord_channel_id = Prompt.ask("Enter Discord Channel ID")
 
@@ -112,7 +173,7 @@ def main():
         
         if (provider == "gemini" and not gemini_key) or (provider == "openai" and not openai_key):
             console.print("[yellow]Warning:[/] Configuration credentials appear to be missing.")
-            if Prompt.ask("Would you like to run the setup wizard now?", choices=["y", "n"], default="y") == "y":
+            if select_option("Would you like to run the setup wizard now?", ["yes", "no"], default_idx=0) == "yes":
                 should_run_setup = True
 
     if should_run_setup:
