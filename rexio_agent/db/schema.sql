@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS skills (
     name TEXT PRIMARY KEY,
     description TEXT NOT NULL,
     code TEXT NOT NULL,             -- Python code content for the skill
+    status TEXT DEFAULT 'pending',  -- 'pending' (awaiting approval) | 'active'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Markdown instruction-based skills (Hermes-style)
+CREATE TABLE IF NOT EXISTS markdown_skills (
+    name TEXT PRIMARY KEY,
+    description TEXT NOT NULL,
+    content TEXT NOT NULL,          -- Markdown instruction content
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

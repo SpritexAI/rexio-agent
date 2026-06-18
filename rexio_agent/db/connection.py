@@ -24,12 +24,17 @@ def init_db() -> None:
 
     with get_db_connection() as conn:
         conn.executescript(schema_sql)
-        # Migration: add steps_json column to existing DBs
-        try:
-            conn.execute("ALTER TABLE messages ADD COLUMN steps_json TEXT")
-            conn.commit()
-        except Exception:
-            pass  # Column already exists
+        # Migrations for existing DBs
+        migrations = [
+            "ALTER TABLE messages ADD COLUMN steps_json TEXT",
+            "ALTER TABLE skills ADD COLUMN status TEXT DEFAULT 'pending'",
+        ]
+        for migration in migrations:
+            try:
+                conn.execute(migration)
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
 
 # --- Conversation & Message Helpers ---
 
@@ -79,33 +84,92 @@ def get_messages(conv_id: str) -> List[Dict[str, Any]]:
 
 # --- Skills Helpers ---
 
-def save_skill(name: str, description: str, code: str) -> None:
+def save_skill(name: str, description: str, code: str, status: str = 'pending') -> None:
     with get_db_connection() as conn:
         conn.execute(
             """
-            INSERT INTO skills (name, description, code, updated_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO skills (name, description, code, status, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(name) DO UPDATE SET
                 description = excluded.description,
                 code = excluded.code,
+                status = excluded.status,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (name, description, code)
+            (name, description, code, status)
         )
         conn.commit()
 
 def get_skills() -> List[Dict[str, Any]]:
     with get_db_connection() as conn:
-        rows = conn.execute("SELECT name, description, code, created_at, updated_at FROM skills").fetchall()
+        rows = conn.execute(
+            "SELECT name, description, code, status, created_at, updated_at FROM skills"
+        ).fetchall()
         return [dict(row) for row in rows]
+
+def get_active_skills() -> List[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            "SELECT name, description, code FROM skills WHERE status = 'active'"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+def get_pending_skills() -> List[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            "SELECT name, description, code, created_at FROM skills WHERE status = 'pending' ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+def approve_skill(name: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE skills SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE name = ?",
+            (name,)
+        )
+        conn.commit()
+
+def reject_skill(name: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute("DELETE FROM skills WHERE name = ?", (name,))
+        conn.commit()
 
 def get_skill(name: str) -> Optional[Dict[str, Any]]:
     with get_db_connection() as conn:
         row = conn.execute(
-            "SELECT name, description, code, created_at, updated_at FROM skills WHERE name = ?",
+            "SELECT name, description, code, status, created_at, updated_at FROM skills WHERE name = ?",
             (name,)
         ).fetchone()
         return dict(row) if row else None
+
+# --- Markdown Skills Helpers ---
+
+def save_markdown_skill(name: str, description: str, content: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO markdown_skills (name, description, content, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(name) DO UPDATE SET
+                description = excluded.description,
+                content = excluded.content,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (name, description, content)
+        )
+        conn.commit()
+
+def get_markdown_skills() -> List[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            "SELECT name, description, content FROM markdown_skills"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+def delete_markdown_skill(name: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute("DELETE FROM markdown_skills WHERE name = ?", (name,))
+        conn.commit()
 
 # --- Tasks Helpers ---
 

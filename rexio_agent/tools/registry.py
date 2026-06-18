@@ -3,7 +3,7 @@ from typing import Dict, Any, Callable, List, Optional
 from rexio_agent.tools.file_tools import read_file, write_file, list_directory
 from rexio_agent.tools.web_tools import search_web
 from rexio_agent.tools.executor import execute_python_code
-from rexio_agent.db.connection import get_skills
+from rexio_agent.db.connection import get_active_skills, get_markdown_skills
 
 # Built-in tools registry
 BUILTIN_TOOLS: Dict[str, Callable] = {
@@ -19,10 +19,23 @@ class ToolRegistry:
         self.tools: Dict[str, Callable] = dict(BUILTIN_TOOLS)
         self.load_custom_skills()
         
-    def load_custom_skills(self) -> None:
-        """Loads learned skills from the database and adds them to the active tools."""
+    def get_markdown_context(self) -> str:
+        """Returns markdown skill instructions to inject into the system prompt."""
         try:
-            db_skills = get_skills()
+            skills = get_markdown_skills()
+            if not skills:
+                return ""
+            parts = ["\n## Skill Instructions\n"]
+            for s in skills:
+                parts.append(f"### {s['name']}\n{s['content']}\n")
+            return "\n".join(parts)
+        except Exception:
+            return ""
+
+    def load_custom_skills(self) -> None:
+        """Loads only approved (active) skills from the database."""
+        try:
+            db_skills = get_active_skills()
             for skill in db_skills:
                 name = skill["name"]
                 code = skill["code"]
@@ -80,7 +93,7 @@ class ToolRegistry:
         skill_name = compiler.compile_and_save(task_description, execution_log)
         
         if skill_name:
-            self.load_custom_skills()  # reload to make it active
+            self.load_custom_skills()  # reload active skills
             return f"Success: Created new tool '{skill_name}' and saved to filesystem/database."
         else:
             return "Error: Could not compile workflow into a valid Python skill tool."

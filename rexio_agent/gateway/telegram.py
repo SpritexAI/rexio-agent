@@ -2,9 +2,10 @@ import os
 import json
 import logging
 import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from rexio_agent.core.loop import AgentSession
+from rexio_agent.db.connection import get_pending_skills, approve_skill, reject_skill
 
 logger = logging.getLogger("rexio_agent.gateway.telegram")
 
@@ -27,6 +28,53 @@ def tool_label(tool: str, args: str) -> str:
         if q:
             label = f'🔍 Searching "{q}"'
     return label
+
+
+async def skills_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows pending skills awaiting approval."""
+    chat_id = update.effective_chat.id
+    target = os.getenv("TELEGRAM_CHAT_ID")
+    if target and str(chat_id) != str(target):
+        return
+
+    pending = get_pending_skills()
+    if not pending:
+        await update.message.reply_text("✅ No pending skills. All clear.")
+        return
+
+    for skill in pending:
+        preview = skill['code'][:300] + ("..." if len(skill['code']) > 300 else "")
+        text = (
+            f"🔧 *{skill['name']}*\n"
+            f"_{skill['description']}_\n\n"
+            f"```python\n{preview}\n```"
+        )
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Approve", callback_data=f"skill_approve:{skill['name']}"),
+            InlineKeyboardButton("❌ Reject",  callback_data=f"skill_reject:{skill['name']}"),
+        ]])
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=keyboard)
+
+
+async def skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles approve/reject inline button presses."""
+    query = update.callback_query
+    await query.answer()
+
+    action, skill_name = query.data.split(":", 1)
+
+    if action == "skill_approve":
+        approve_skill(skill_name)
+        # Reload registry in all active sessions
+        for session in sessions.values():
+            session.registry.load_custom_skills()
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(f"✅ *{skill_name}* approved and activated!", parse_mode="Markdown")
+
+    elif action == "skill_reject":
+        reject_skill(skill_name)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(f"🗑 *{skill_name}* rejected and deleted.", parse_mode="Markdown")
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -177,6 +225,8 @@ async def run_telegram_bot() -> None:
     application = ApplicationBuilder().token(token).build()
 
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("skills", skills_command))
+    application.add_handler(CallbackQueryHandler(skill_callback, pattern=r"^skill_(approve|reject):"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     await application.initialize()
