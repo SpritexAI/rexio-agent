@@ -46,20 +46,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
     session = sessions[conv_id]
-    
-    # Show typing status to let the user know the agent is thinking
-    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    
+
+    async def keep_typing():
+        """Telegram's typing indicator expires after ~5s; refresh it
+        continuously while the (potentially multi-step) agent loop runs."""
+        try:
+            while True:
+                await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+                await asyncio.sleep(4)
+        except asyncio.CancelledError:
+            pass
+
+    typing_task = asyncio.ensure_future(keep_typing())
+
     try:
         # Run the agent ReAct loop in a separate thread to prevent blocking the asyncio loop
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, session.run, user_text)
-        
+
         # Send the final response back to the user
         await update.message.reply_text(response)
     except Exception as e:
         logger.error(f"Error executing agent session for chat {chat_id}: {str(e)}")
         await update.message.reply_text(f"⚠ An error occurred: {str(e)}")
+    finally:
+        typing_task.cancel()
 
 async def run_telegram_bot() -> None:
     """Starts the Telegram bot application."""
