@@ -41,6 +41,7 @@ export default function App() {
   });
   const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
   const [showLogModal, setShowLogModal] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -177,6 +178,8 @@ export default function App() {
         backendStatus={backendStatus}
         fetchStatus={fetchStatus}
         handleCreateSession={handleCreateSession}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
       />
 
       {/* 2. Middle Panel: Chat Window & Input Bar */}
