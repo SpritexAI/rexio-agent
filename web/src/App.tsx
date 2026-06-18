@@ -160,7 +160,15 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-[#0f0f0f] text-gray-200 overflow-hidden font-sans select-none">
+    <div className="flex h-screen w-screen bg-[#0f0f0f] text-gray-200 overflow-hidden font-sans select-none relative">
+      <div 
+        className="fixed inset-0 -z-10 w-full h-full pointer-events-none"
+        style={{
+          backgroundColor: '#0F0F0F',
+          backgroundImage: 'radial-gradient(rgba(192, 132, 252, 0.05) 1.2px, transparent 1.2px)',
+          backgroundSize: '32px 32px',
+        }}
+      />
       {/* 1. Left Sidebar: Sessions & Status */}
       <Sidebar
         conversations={conversations}

@@ -14,7 +14,7 @@ export default function ChatInput({
   isThinking,
 }: ChatInputProps) {
   return (
-    <div className="p-4 border-t border-white/[0.06] bg-[#0f0f0f]">
+    <div className="p-4 border-t border-white/[0.06] bg-[#0f0f0f]/60 backdrop-blur-md">
       <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
         <input
           type="text"

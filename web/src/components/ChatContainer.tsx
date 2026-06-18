@@ -32,9 +32,9 @@ export default function ChatContainer({
   messagesEndRef,
 }: ChatContainerProps) {
   return (
-    <div className="flex-1 flex flex-col bg-[#0f0f0f] relative overflow-hidden">
+    <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
       {/* Top Chat Header */}
-      <div className="h-16 border-b border-white/[0.06] px-6 flex items-center justify-between bg-[#0f0f0f] flex-shrink-0">
+      <div className="h-16 border-b border-white/[0.06] px-6 flex items-center justify-between bg-transparent flex-shrink-0">
         <div>
           <h2 className="text-sm font-mono font-bold text-white">ACTIVE: {activeConvId}</h2>
           <p className="text-xs text-gray-500">FastAPI Agent webhook streaming</p>
