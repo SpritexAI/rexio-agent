@@ -42,6 +42,7 @@ export default function App() {
   const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
   const [showLogModal, setShowLogModal] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [thinkingText, setThinkingText] = useState<string>('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -120,6 +121,7 @@ export default function App() {
     setInputMessage('');
     setIsThinking(true);
     setActiveStepLog([]);
+    setThinkingText('');
 
     // Optimistically append user message
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
@@ -166,9 +168,9 @@ export default function App() {
 
             if (event.type === 'token') {
               if (firstToken) {
-                // Hide thinking icon and create the assistant message row on first token only
                 firstToken = false;
                 setIsThinking(false);
+                setThinkingText('');
                 setMessages((prev) => {
                   streamingIndex.current = prev.length;
                   return [...prev, { role: 'assistant', content: event.text }];
@@ -183,6 +185,8 @@ export default function App() {
                   return updated;
                 });
               }
+            } else if (event.type === 'thinking') {
+              setThinkingText(event.text);
             } else if (event.type === 'step') {
               setActiveStepLog((prev) => [...prev, event]);
             } else if (event.type === 'done') {
@@ -236,6 +240,7 @@ export default function App() {
         <ChatContainer
           messages={messages}
           isThinking={isThinking}
+          thinkingText={thinkingText}
           activeStepLog={activeStepLog}
           setShowLogModal={setShowLogModal}
           messagesEndRef={messagesEndRef}

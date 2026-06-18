@@ -86,6 +86,11 @@
   50%       { transform: scale(1); }
 }
 
+@keyframes rexio-fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── MessageBubble Markdown / Text Styling ── */
 .rexio-user-content {
   font-size: var(--bubble-font-user) !important;

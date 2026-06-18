@@ -17,6 +17,7 @@ interface ExecutionStep {
 interface ChatContainerProps {
   messages: Message[];
   isThinking: boolean;
+  thinkingText: string;
   activeStepLog: ExecutionStep[];
   setShowLogModal: (show: boolean) => void;
   messagesEndRef: RefObject<HTMLDivElement | null>;
@@ -78,6 +79,7 @@ function renderContent(text: string) {
 export default function ChatContainer({
   messages,
   isThinking,
+  thinkingText,
   activeStepLog,
   setShowLogModal,
   messagesEndRef,
@@ -171,6 +173,14 @@ export default function ChatContainer({
                   style={{ animation: 'rexio-spin 2s linear infinite' }}
                 />
               </div>
+              {thinkingText && (
+                <p
+                  className="mt-2 ml-1 text-xs italic text-[#6b6b68] max-w-xl leading-relaxed"
+                  style={{ animation: 'rexio-fadein 0.3s ease-out' }}
+                >
+                  {thinkingText}
+                </p>
+              )}
             </div>
           )}
           <div ref={messagesEndRef} />
