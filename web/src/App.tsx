@@ -160,11 +160,11 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-[#0f0f0f] text-gray-200 overflow-hidden font-sans select-none relative">
+    <div className="flex h-screen w-screen bg-[#1f1f1e] text-gray-200 overflow-hidden font-sans select-none relative">
       <div 
         className="fixed inset-0 -z-10 w-full h-full pointer-events-none"
         style={{
-          backgroundColor: '#0F0F0F',
+          backgroundColor: '#1f1f1e',
           backgroundImage: 'radial-gradient(rgba(192, 132, 252, 0.05) 1.2px, transparent 1.2px)',
           backgroundSize: '32px 32px',
         }}
@@ -180,9 +180,8 @@ export default function App() {
       />
 
       {/* 2. Middle Panel: Chat Window & Input Bar */}
-      <div className="flex-1 flex flex-col bg-[#0f0f0f] relative overflow-hidden">
+      <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
         <ChatContainer
-          activeConvId={activeConvId}
           messages={messages}
           isThinking={isThinking}
           activeStepLog={activeStepLog}

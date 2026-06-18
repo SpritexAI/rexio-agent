@@ -1,36 +1,200 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+
+:root {
+  --color-rexio-primary: #8b5cf6;
+  --color-rexio-primary-glow: rgba(139, 92, 246, 0.5);
+  
+  --color-bg-obsidian: #1f1f1e;
+  --color-bg-card: rgba(20, 20, 20, 0.7);
+  --color-bg-glass: rgba(255, 255, 255, 0.03);
+  --color-border-glass: rgba(255, 255, 255, 0.08);
+  
+  --color-text-main: #ffffff;
+  --color-text-muted: #a1a1aa;
+  
+  --bubble-scale: 1.0;
+  --bubble-font-user: calc(15.5px * var(--bubble-scale));
+  --bubble-font-ai: calc(15.5px * var(--bubble-scale));
+  
+  --bubble-padding-y: calc(12px * var(--bubble-scale));
+  --bubble-padding-x: calc(16px * var(--bubble-scale));
+  --bubble-radius-outer: calc(20px * var(--bubble-scale));
+  --bubble-radius-inner: calc(4px * var(--bubble-scale));
+  --bubble-ai-icon-size: calc(36px * var(--bubble-scale));
+  --bubble-ai-spacer: calc(8px * var(--bubble-scale));
+
+  --bubble-scale-desktop: 1.125;
+  --bubble-font-user-desktop: calc(15.5px * var(--bubble-scale-desktop));
+  --bubble-font-ai-desktop: calc(15.5px * var(--bubble-scale-desktop));
+  --bubble-padding-y-desktop: calc(12px * var(--bubble-scale-desktop));
+  --bubble-padding-x-desktop: calc(16px * var(--bubble-scale-desktop));
+  --bubble-radius-outer-desktop: calc(20px * var(--bubble-scale-desktop));
+  --bubble-radius-inner-desktop: calc(4px * var(--bubble-scale-desktop));
+  --bubble-ai-icon-size-desktop: calc(36px * var(--bubble-scale-desktop));
+  --bubble-ai-spacer-desktop: calc(8px * var(--bubble-scale-desktop));
+}
 
 @layer base {
   body {
-    font-family: 'Outfit', sans-serif;
-    background-color: #0b0f19;
-    color: #e5e7eb;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #1f1f1e;
+    color: #ffffff;
   }
 }
 
-/* Scrollbars styling */
+/* Premium RexiO Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--color-bg-obsidian);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  background: var(--color-bg-glass);
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--color-rexio-primary-glow);
 }
 
-/* Glassmorphism utility card styling */
-.glass-panel {
-  background: rgba(17, 24, 39, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Custom Scrollbar for list panels */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── MessageBubble Markdown / Text Styling ── */
+.rexio-user-content {
+  font-size: var(--bubble-font-user) !important;
+  line-height: 1.45 !important;
+  padding: var(--bubble-padding-y) var(--bubble-padding-x) !important;
+  border-radius: var(--bubble-radius-outer) var(--bubble-radius-outer) var(--bubble-radius-inner) var(--bubble-radius-outer) !important;
+}
+
+.rexio-ai-content {
+  font-size: var(--bubble-font-ai) !important;
+  line-height: 1.55 !important;
+}
+
+.rexio-ai-content p {
+  margin: 0 0 0.6em 0;
+}
+.rexio-ai-content p:last-child {
+  margin-bottom: 0;
+}
+.rexio-ai-content h1.rexio-h1 {
+  font-size: 1.3em !important;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 1em 0 0.5em;
+}
+.rexio-ai-content h2.rexio-h2 {
+  font-size: 1.15em !important;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin: 0.8em 0 0.4em;
+}
+.rexio-ai-content h3.rexio-h3 {
+  font-size: 1.05em !important;
+  font-weight: 600;
+  color: #d4d4d8;
+  margin: 0.7em 0 0.3em;
+}
+.rexio-ai-content ul.rexio-ul {
+  padding-left: 1.25em;
+  margin: 0.4em 0 0.6em;
+}
+.rexio-ai-content ol.rexio-ol {
+  padding-left: 1.25em;
+  margin: 0.4em 0 0.6em;
+}
+.rexio-ai-content li.rexio-li {
+  margin-bottom: 0.25em;
+  color: #d4d4d8;
+  line-height: 1.6;
+}
+
+.rexio-code-block,
+.rexio-ai-content pre.rexio-code-block {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.8em 1em !important;
+  overflow-x: auto;
+  margin: 0.8em 0 !important;
+  font-size: 0.9em !important;
+  line-height: 1.5;
+  font-family: 'JetBrains Mono', monospace;
+  color: #e4e4e7;
+}
+
+.rexio-ai-content code.rexio-inline-code,
+.rexio-ai-content .rexio-inline-code {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  padding: 0.15em 0.4em !important;
+  border-radius: 4px;
+  font-size: 0.85em !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Tables styling */
+.rexio-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rexio-th {
+  background: rgba(139, 92, 246, 0.15);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.rexio-td {
+  padding: 9px 14px;
+  color: #d4d4d8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: top;
+}
+
+.rexio-table tbody tr:last-child .rexio-td {
+  border-bottom: none;
+}
+
+.rexio-table tbody tr:hover {
+  background: rgba(139, 92, 246, 0.05);
+}
+
+@media (min-width: 768px) {
+  .rexio-user-content {
+    font-size: var(--bubble-font-user-desktop) !important;
+    padding: var(--bubble-padding-y-desktop) var(--bubble-padding-x-desktop) !important;
+    border-radius: var(--bubble-radius-outer-desktop) var(--bubble-radius-outer-desktop) var(--bubble-radius-inner-desktop) var(--bubble-radius-outer-desktop) !important;
+  }
+  .rexio-ai-content {
+    font-size: var(--bubble-font-ai-desktop) !important;
+    line-height: 1.55 !important;
+  }
+}
+
