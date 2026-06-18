@@ -230,6 +230,7 @@ def run_setup_wizard(config_path: str) -> None:
     current_model = ""
     current_gemini_key = ""
     current_openai_key = ""
+    current_openrouter_key = ""
     current_api_base = ""
     current_telegram_token = ""
     current_telegram_chat_id = ""
@@ -242,6 +243,7 @@ def run_setup_wizard(config_path: str) -> None:
         current_model = os.getenv("MODEL_NAME", "")
         current_gemini_key = os.getenv("GEMINI_API_KEY", "")
         current_openai_key = os.getenv("OPENAI_API_KEY", "")
+        current_openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
         current_api_base = os.getenv("API_BASE_URL", "")
         current_telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         current_telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -283,6 +285,7 @@ def run_setup_wizard(config_path: str) -> None:
     # 3. API Credentials Configuration (Moved to Step 3, before Model Selection)
     gemini_key = ""
     openai_key = ""
+    openrouter_key = ""
     api_base_url = ""
     
     if provider == "gemini":
@@ -312,17 +315,17 @@ def run_setup_wizard(config_path: str) -> None:
                 openai_key = Prompt.ask("OPENAI_API_KEY cannot be empty. Please enter key", password=True)
                 
     elif provider == "openrouter":
-        if current_openai_key:
-            mask_preview = f"{current_openai_key[:4]}...{current_openai_key[-4:] if len(current_openai_key) > 8 else ''}"
+        if current_openrouter_key:
+            mask_preview = f"{current_openrouter_key[:4]}...{current_openrouter_key[-4:] if len(current_openrouter_key) > 8 else ''}"
             keep_existing = select_option(f"An existing OpenRouter API Key is configured ({mask_preview}). Keep it?", ["yes", "no"], default_idx=0)
             if keep_existing == "yes":
-                openai_key = current_openai_key
+                openrouter_key = current_openrouter_key
             else:
-                openai_key = Prompt.ask("Enter new OpenRouter API Key", password=True)
+                openrouter_key = Prompt.ask("Enter new OpenRouter API Key", password=True)
         else:
-            openai_key = Prompt.ask("Enter your OpenRouter API Key (masking inputs)", password=True)
-            while not openai_key.strip():
-                openai_key = Prompt.ask("OpenRouter API Key cannot be empty. Please enter key", password=True)
+            openrouter_key = Prompt.ask("Enter your OpenRouter API Key (masking inputs)", password=True)
+            while not openrouter_key.strip():
+                openrouter_key = Prompt.ask("OpenRouter API Key cannot be empty. Please enter key", password=True)
         api_base_url = "https://openrouter.ai/api/v1"
         
     else: # custom
@@ -337,7 +340,7 @@ def run_setup_wizard(config_path: str) -> None:
         elif provider == "openai":
             fetched = fetch_provider_models("openai", openai_key, api_base_url)
         elif provider == "openrouter":
-            fetched = fetch_provider_models("openrouter", openai_key)
+            fetched = fetch_provider_models("openrouter", openrouter_key)
         elif provider == "custom":
             fetched = fetch_provider_models("custom", openai_key, api_base_url)
             
@@ -448,6 +451,7 @@ def run_setup_wizard(config_path: str) -> None:
         "MODEL_NAME": model_name,
         "GEMINI_API_KEY": gemini_key,
         "OPENAI_API_KEY": openai_key,
+        "OPENROUTER_API_KEY": openrouter_key,
         "API_BASE_URL": api_base_url,
         "TELEGRAM_BOT_TOKEN": telegram_token,
         "TELEGRAM_CHAT_ID": telegram_chat_id,
@@ -465,7 +469,9 @@ def run_setup_wizard(config_path: str) -> None:
     key_configured = False
     if provider == "gemini" and gemini_key:
         key_configured = True
-    elif provider in ("openai", "openrouter") and openai_key:
+    elif provider == "openai" and openai_key:
+        key_configured = True
+    elif provider == "openrouter" and openrouter_key:
         key_configured = True
     elif provider == "custom":
         key_configured = True
@@ -602,8 +608,9 @@ def main():
         provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
         gemini_key = os.getenv("GEMINI_API_KEY", "")
         openai_key = os.getenv("OPENAI_API_KEY", "")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
         
-        if (provider == "gemini" and not gemini_key) or (provider == "openai" and not openai_key):
+        if (provider == "gemini" and not gemini_key) or (provider == "openai" and not openai_key) or (provider == "openrouter" and not openrouter_key):
             console.print("[yellow]Warning:[/] Configuration credentials appear to be missing.")
             if select_option("Would you like to run the setup wizard now?", ["yes", "no"], default_idx=0) == "yes":
                 try:

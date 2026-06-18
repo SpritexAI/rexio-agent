@@ -14,6 +14,7 @@ class LlmClient:
         
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.openai_key = os.getenv("OPENAI_API_KEY")
+        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
         self.api_base = os.getenv("API_BASE_URL") # Custom endpoint (e.g., OpenRouter, Ollama)
         
         self.genai_client = None
@@ -51,11 +52,12 @@ class LlmClient:
             )
             
         elif self.provider == "openrouter":
-            if not self.openai_key:
-                raise ValueError("OPENAI_API_KEY (used for OpenRouter) is not set in environment variables.")
+            key = self.openrouter_key or self.openai_key
+            if not key:
+                raise ValueError("OPENROUTER_API_KEY (used for OpenRouter) is not set in environment variables.")
             from openai import OpenAI
             self.openai_client = OpenAI(
-                api_key=self.openai_key,
+                api_key=key,
                 base_url=self.api_base or "https://openrouter.ai/api/v1"
             )
             
