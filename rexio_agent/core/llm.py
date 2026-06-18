@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any, Optional
+from typing import Generator, List, Optional
 from dotenv import load_dotenv
 
 # Load env variables from absolute .env file path
@@ -116,3 +116,43 @@ class LlmClient:
             
         else:
             raise ValueError("No API client initialized. Check your credentials.")
+
+    def generate_stream(self, system_instruction: str, prompt: str, stop_sequences: Optional[List[str]] = None) -> Generator[str, None, None]:
+        """Streams text chunks from the model as they are generated."""
+        if self.provider == "gemini" and self.genai_client:
+            from google.genai import types
+            config = types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                stop_sequences=stop_sequences,
+                temperature=0.2,
+            )
+            for chunk in self.genai_client.models.generate_content_stream(
+                model=self.model_name,
+                contents=prompt,
+                config=config,
+            ):
+                if chunk.text:
+                    yield chunk.text
+
+        elif self.openai_client:
+            model = self.model_name
+            if self.provider == "gemini_openai_fallback" and not model.startswith("models/"):
+                model = f"models/{model}"
+            stream = self.openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": prompt},
+                ],
+                stop=stop_sequences,
+                temperature=0.2,
+                stream=True,
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+
+        else:
+            raise ValueError("No API client initialized. Check your credentials.")
+

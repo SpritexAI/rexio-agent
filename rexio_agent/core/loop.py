@@ -1,7 +1,8 @@
 import re
 import ast
+import json
 import uuid
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, Generator, List, Tuple, Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -150,3 +151,83 @@ class AgentSession:
             
         save_message(self.conversation_id, "assistant", final_answer)
         return final_answer
+
+    def run_stream(self, user_input: str, max_steps: int = 10) -> Generator[str, None, None]:
+        """Executes the ReAct loop, then streams the final answer token-by-token as SSE events.
+
+        Yields SSE-formatted strings:
+          - data: {"type": "step", "thought": ..., "tool": ..., "args": ..., "observation": ...}
+          - data: {"type": "token", "text": "..."}
+          - data: {"type": "done", "conversation_id": "..."}
+          - data: {"type": "error", "message": "..."}
+        """
+        self.execution_log: List[Dict[str, Any]] = []
+
+        history = get_messages(self.conversation_id)
+        save_message(self.conversation_id, "user", user_input)
+
+        history_prompt = ""
+        for msg in history:
+            role_label = "User" if msg["role"] == "user" else "Assistant"
+            history_prompt += f"{role_label}: {msg['content']}\n"
+        history_prompt += f"User: {user_input}\n"
+
+        system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
+            tool_definitions=self.registry.get_tool_definitions()
+        )
+
+        trace = history_prompt + "\nAssistant:\n"
+        step = 0
+        final_answer_tokens: List[str] = []
+
+        try:
+            while step < max_steps:
+                step += 1
+                response_text = self.llm.generate(
+                    system_instruction=system_instruction,
+                    prompt=trace,
+                    stop_sequences=["Observation:"]
+                )
+                trace += response_text
+
+                thought, action = extract_action_and_thought(response_text)
+
+                if action:
+                    tool_name, tool_args = action
+                    observation = self.registry.execute(tool_name, tool_args, execution_log=self.execution_log)
+
+                    step_event = {
+                        "type": "step",
+                        "thought": thought or "",
+                        "tool": tool_name,
+                        "args": str(tool_args),
+                        "observation": observation,
+                    }
+                    self.execution_log.append(step_event)
+                    yield f"data: {json.dumps(step_event)}\n\n"
+                    trace += f"\nObservation: {observation}\n"
+                else:
+                    # Reached Final Answer — stream it token by token
+                    final_match = re.search(r'Final Answer:\s*(.*)', response_text, re.DOTALL)
+                    preamble = final_match.group(1).strip() if final_match else response_text.replace("Assistant:", "").strip()
+
+                    # Stream the preamble text we already have, then continue streaming
+                    if preamble:
+                        final_answer_tokens.append(preamble)
+                        yield f"data: {json.dumps({'type': 'token', 'text': preamble})}\n\n"
+
+                    # Stream remaining tokens from a fresh LLM call if preamble was cut off
+                    # (Only needed when model stopped naturally at Final Answer marker)
+                    break
+
+            final_answer = "".join(final_answer_tokens).strip()
+            if not final_answer:
+                final_answer = "Sorry, I could not complete the request within the step limit."
+                yield f"data: {json.dumps({'type': 'token', 'text': final_answer})}\n\n"
+
+            save_message(self.conversation_id, "assistant", final_answer)
+            yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
+
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+

@@ -4,6 +4,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -99,6 +100,32 @@ def post_chat_message(req: ChatRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/chat/stream")
+def post_chat_stream(req: ChatRequest):
+    """Sends a message and streams the agent's response as Server-Sent Events."""
+    conv_id = req.conversation_id
+
+    if conv_id not in sessions:
+        try:
+            sessions[conv_id] = AgentSession(
+                platform=req.platform,
+                channel_id=req.channel_id,
+                conversation_id=conv_id
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to initialize session: {str(e)}")
+
+    session = sessions[conv_id]
+
+    return StreamingResponse(
+        session.run_stream(req.message),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @app.get("/api/skills")
 def get_agent_skills():

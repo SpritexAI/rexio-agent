@@ -121,11 +121,18 @@ export default function App() {
     setIsThinking(true);
     setActiveStepLog([]);
 
-    // Optimistically update message log in UI
+    // Optimistically append user message
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
 
+    // Placeholder for streaming assistant reply
+    const streamingIndex = { current: -1 };
+    setMessages((prev) => {
+      streamingIndex.current = prev.length;
+      return [...prev, { role: 'assistant', content: '' }];
+    });
+
     try {
-      const res = await fetch(`${BACKEND_URL}/api/chat`, {
+      const res = await fetch(`${BACKEND_URL}/api/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,29 +143,66 @@ export default function App() {
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const errMsg = errData.detail || 'Failed to send message to agent';
-        throw new Error(errMsg);
+      if (!res.ok || !res.body) {
+        throw new Error('Stream request failed');
       }
 
-      const data = await res.json();
-      setMessages(data.messages || []);
-      if (data.execution_log) {
-        setActiveStepLog(data.execution_log);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const raw = line.slice(5).trim();
+          if (!raw) continue;
+
+          try {
+            const event = JSON.parse(raw);
+
+            if (event.type === 'token') {
+              // Drop the thinking indicator the moment text begins streaming
+              setIsThinking(false);
+              setMessages((prev) => {
+                const updated = [...prev];
+                const idx = streamingIndex.current;
+                if (idx >= 0 && updated[idx]) {
+                  updated[idx] = { ...updated[idx], content: updated[idx].content + event.text };
+                }
+                return updated;
+              });
+            } else if (event.type === 'step') {
+              setActiveStepLog((prev) => [...prev, event]);
+            } else if (event.type === 'done') {
+              if (event.execution_log) setActiveStepLog(event.execution_log);
+              fetchConversations();
+            } else if (event.type === 'error') {
+              throw new Error(event.message);
+            }
+          } catch {
+            // Non-JSON line, skip
+          }
+        }
       }
-      // Refresh conversations list
-      fetchConversations();
     } catch (err: any) {
-      console.error('Error sending message:', err);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'system', content: `Error: ${err.message || 'Could not reach agent backend.'}` },
-      ]);
+      console.error('Stream error:', err);
+      setMessages((prev) => {
+        // Remove empty streaming placeholder if it exists
+        const updated = prev.filter((m, i) => !(i === streamingIndex.current && m.content === ''));
+        return [...updated, { role: 'system', content: `Error: ${err.message || 'Could not reach agent backend.'}` }];
+      });
     } finally {
       setIsThinking(false);
     }
   };
+
 
   return (
     <div className="flex h-screen w-screen bg-[#1f1f1e] text-gray-200 overflow-hidden font-sans select-none relative">
