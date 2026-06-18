@@ -81,58 +81,136 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
 
 def run_setup_wizard(env_path: str) -> None:
     """Runs an interactive CLI setup wizard to configure the API keys and models."""
-    console.print(Panel(Text("RexiO Agent Setup Wizard ☤", style="bold cyan"), title="System Setup"))
-    console.print("Let's configure your environment. This will create or update your local [yellow].env[/] file.\n")
+    from rexio_agent.db.connection import DB_PATH
     
-    # 1. LLM Provider (rendered as a dropdown)
-    provider = select_option("Select LLM Provider", ["gemini", "openai", "openrouter", "custom"])
+    # 1. Print the premium boxed welcome header
+    console.print()
+    console.print("[bold cyan]┌─────────────────────────────────────────────────────────┐[/]")
+    console.print("[bold cyan]│            ☤ RexiO Agent Setup Wizard                 │[/]")
+    console.print("[bold cyan]├─────────────────────────────────────────────────────────┤[/]")
+    console.print("[bold cyan]│  Let's configure your RexiO Agent environment.          │[/]")
+    console.print("[bold cyan]│  Press Ctrl+C at any time to exit.                      │[/]")
+    console.print("[bold cyan]└─────────────────────────────────────────────────────────┘[/]")
+    console.print()
+
+    install_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 2. Model Name
-    if provider == "gemini":
-        default_model = "gemini-2.5-flash"
-    elif provider == "openrouter":
-        default_model = "google/gemini-2.5-flash"
+    console.print("[bold cyan]◆ Configuration Locations[/]")
+    console.print(f"  [bold]Environment File (.env):[/] {env_path}")
+    console.print(f"  [bold]Database Path (SQLite):[/]  {DB_PATH}")
+    console.print(f"  [bold]Install Directory:[/]       {install_dir}")
+    console.print()
+
+    # Load existing configuration defaults if present
+    current_provider = "gemini"
+    current_model = ""
+    current_gemini_key = ""
+    current_openai_key = ""
+    current_api_base = ""
+    current_telegram_token = ""
+    current_telegram_chat_id = ""
+    current_discord_token = ""
+    current_discord_channel_id = ""
+
+    if os.path.exists(env_path):
+        load_dotenv(env_path, override=True)
+        current_provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
+        current_model = os.getenv("MODEL_NAME", "")
+        current_gemini_key = os.getenv("GEMINI_API_KEY", "")
+        current_openai_key = os.getenv("OPENAI_API_KEY", "")
+        current_api_base = os.getenv("API_BASE_URL", "")
+        current_telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        current_telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+        current_discord_token = os.getenv("DISCORD_BOT_TOKEN", "")
+        current_discord_channel_id = os.getenv("DISCORD_CHANNEL_ID", "")
+
+    # 2. Select LLM Provider
+    provider_choices = ["gemini", "openai", "openrouter", "custom"]
+    default_provider_idx = 0
+    if current_provider in provider_choices:
+        default_provider_idx = provider_choices.index(current_provider)
+        
+    provider = select_option("Select LLM Provider", provider_choices, default_idx=default_provider_idx)
+    
+    # 3. Model Name
+    if not current_model:
+        if provider == "gemini":
+            default_model = "gemini-2.5-flash"
+        elif provider == "openrouter":
+            default_model = "google/gemini-2.5-flash"
+        else:
+            default_model = "gpt-4o"
     else:
-        default_model = "gpt-4o"
+        default_model = current_model
+        
     model_name = Prompt.ask("Enter Model Name", default=default_model)
     
-    # 3. API Keys
+    # 4. API Credentials Configuration
     gemini_key = ""
     openai_key = ""
     api_base_url = ""
     
     if provider == "gemini":
-        gemini_key = Prompt.ask("Enter your GEMINI_API_KEY (masking inputs)", password=True)
-        while not gemini_key.strip():
-            gemini_key = Prompt.ask("GEMINI_API_KEY cannot be empty. Please enter key", password=True)
+        if current_gemini_key:
+            mask_preview = f"{current_gemini_key[:4]}...{current_gemini_key[-4:] if len(current_gemini_key) > 8 else ''}"
+            keep_existing = select_option(f"An existing GEMINI_API_KEY is configured ({mask_preview}). Keep it?", ["yes", "no"], default_idx=0)
+            if keep_existing == "yes":
+                gemini_key = current_gemini_key
+            else:
+                gemini_key = Prompt.ask("Enter new GEMINI_API_KEY", password=True)
+        else:
+            gemini_key = Prompt.ask("Enter your GEMINI_API_KEY (masking inputs)", password=True)
+            while not gemini_key.strip():
+                gemini_key = Prompt.ask("GEMINI_API_KEY cannot be empty. Please enter key", password=True)
+                
     elif provider == "openai":
-        openai_key = Prompt.ask("Enter your OPENAI_API_KEY (masking inputs)", password=True)
-        while not openai_key.strip():
-            openai_key = Prompt.ask("OPENAI_API_KEY cannot be empty. Please enter key", password=True)
+        if current_openai_key:
+            mask_preview = f"{current_openai_key[:4]}...{current_openai_key[-4:] if len(current_openai_key) > 8 else ''}"
+            keep_existing = select_option(f"An existing OPENAI_API_KEY is configured ({mask_preview}). Keep it?", ["yes", "no"], default_idx=0)
+            if keep_existing == "yes":
+                openai_key = current_openai_key
+            else:
+                openai_key = Prompt.ask("Enter new OPENAI_API_KEY", password=True)
+        else:
+            openai_key = Prompt.ask("Enter your OPENAI_API_KEY (masking inputs)", password=True)
+            while not openai_key.strip():
+                openai_key = Prompt.ask("OPENAI_API_KEY cannot be empty. Please enter key", password=True)
+                
     elif provider == "openrouter":
-        openai_key = Prompt.ask("Enter your OpenRouter API Key (masking inputs)", password=True)
-        while not openai_key.strip():
-            openai_key = Prompt.ask("OpenRouter API Key cannot be empty. Please enter key", password=True)
+        if current_openai_key:
+            mask_preview = f"{current_openai_key[:4]}...{current_openai_key[-4:] if len(current_openai_key) > 8 else ''}"
+            keep_existing = select_option(f"An existing OpenRouter API Key is configured ({mask_preview}). Keep it?", ["yes", "no"], default_idx=0)
+            if keep_existing == "yes":
+                openai_key = current_openai_key
+            else:
+                openai_key = Prompt.ask("Enter new OpenRouter API Key", password=True)
+        else:
+            openai_key = Prompt.ask("Enter your OpenRouter API Key (masking inputs)", password=True)
+            while not openai_key.strip():
+                openai_key = Prompt.ask("OpenRouter API Key cannot be empty. Please enter key", password=True)
         api_base_url = "https://openrouter.ai/api/v1"
+        
     else:
-        openai_key = Prompt.ask("Enter your API Key (e.g. Ollama API key)", default="")
-        api_base_url = Prompt.ask("Enter custom API Base URL (e.g. http://localhost:11434/v1)", default="")
+        openai_key = Prompt.ask("Enter your API Key (e.g. Ollama API key)", default=current_openai_key)
+        api_base_url = Prompt.ask("Enter custom API Base URL (e.g. http://localhost:11434/v1)", default=current_api_base or "http://localhost:11434/v1")
 
-    # 4. Telegram Gateway Integration
+    # 5. Telegram Gateway Integration
     telegram_token = ""
     telegram_chat_id = ""
-    configure_telegram = select_option("Do you want to configure Telegram Bot Gateway?", ["yes", "no"], default_idx=1)
+    default_telegram_idx = 1 if not current_telegram_token else 0
+    configure_telegram = select_option("Do you want to configure Telegram Bot Gateway?", ["yes", "no"], default_idx=default_telegram_idx)
     if configure_telegram == "yes":
-        telegram_token = Prompt.ask("Enter Telegram Bot Token")
-        telegram_chat_id = Prompt.ask("Enter Telegram Chat ID")
+        telegram_token = Prompt.ask("Enter Telegram Bot Token", default=current_telegram_token)
+        telegram_chat_id = Prompt.ask("Enter Telegram Chat ID", default=current_telegram_chat_id)
 
-    # 5. Discord Gateway Integration
+    # 6. Discord Gateway Integration
     discord_token = ""
     discord_channel_id = ""
-    configure_discord = select_option("Do you want to configure Discord Bot Gateway?", ["yes", "no"], default_idx=1)
+    default_discord_idx = 1 if not current_discord_token else 0
+    configure_discord = select_option("Do you want to configure Discord Bot Gateway?", ["yes", "no"], default_idx=default_discord_idx)
     if configure_discord == "yes":
-        discord_token = Prompt.ask("Enter Discord Bot Token")
-        discord_channel_id = Prompt.ask("Enter Discord Channel ID")
+        discord_token = Prompt.ask("Enter Discord Bot Token", default=current_discord_token)
+        discord_channel_id = Prompt.ask("Enter Discord Channel ID", default=current_discord_channel_id)
 
     # Construct file content
     env_content = f"""# Model Configuration
@@ -155,7 +233,37 @@ OPENAI_API_KEY={openai_key}
     with open(env_path, "w", encoding="utf-8") as f:
         f.write(env_content)
         
-    console.print("\n[bold green]Configuration saved successfully to .env![/]\n")
+    # 7. Print tool & configuration availability summary (matching Hermes)
+    console.print("\n[bold cyan]◆ Configuration Summary[/]")
+    console.print(f"  [bold]LLM Provider:[/]  [green]{provider}[/]")
+    console.print(f"  [bold]Model Name:[/]    [green]{model_name}[/]")
+    
+    key_configured = False
+    if provider == "gemini" and gemini_key:
+        key_configured = True
+    elif provider in ("openai", "openrouter") and openai_key:
+        key_configured = True
+    elif provider == "custom":
+        key_configured = True
+        
+    if key_configured:
+        console.print("  [bold]API Credentials:[/] [bold green]✓ Configured[/]")
+    else:
+        console.print("  [bold]API Credentials:[/] [bold red]✗ Missing / Empty[/]")
+        
+    if telegram_token and telegram_chat_id:
+        console.print("  [bold]Telegram Gateway:[/] [bold green]✓ Enabled[/]")
+    else:
+        console.print("  [bold]Telegram Gateway:[/] [dim]Disabled[/]")
+        
+    if discord_token and discord_channel_id:
+        console.print("  [bold]Discord Gateway:[/]  [bold green]✓ Enabled[/]")
+    else:
+        console.print("  [bold]Discord Gateway:[/]  [dim]Disabled[/]")
+        
+    db_status = "[bold green]✓ Initialized[/]" if os.path.exists(DB_PATH) else "[yellow]Pending Init[/]"
+    console.print(f"  [bold]Local Database:[/]   {db_status}")
+    console.print("\n[bold green]🎉 Configuration saved successfully to .env![/]\n")
 
 def main():
     console.print(Panel(Text("Welcome to RexiO Agent ☤\nType 'exit' or 'quit' to end the session.", style="bold cyan", justify="center")))
