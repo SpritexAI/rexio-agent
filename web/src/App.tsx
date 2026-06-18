@@ -188,12 +188,18 @@ export default function App() {
           setShowLogModal={setShowLogModal}
           messagesEndRef={messagesEndRef}
         />
-        <ChatInput
-          inputMessage={inputMessage}
-          setInputMessage={setInputMessage}
-          handleSendMessage={handleSendMessage}
-          isThinking={isThinking}
-        />
+        
+        {/* Floating Input Box Wrapper with gradient background to fade messages */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1e] via-[#1f1f1e]/90 to-transparent pt-12 pb-0 z-10 pointer-events-none">
+          <div className="pointer-events-auto w-full">
+            <ChatInput
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              handleSendMessage={handleSendMessage}
+              isThinking={isThinking}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Trace Log Modal */}

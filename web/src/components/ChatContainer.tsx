@@ -98,7 +98,7 @@ export default function ChatContainer({
       )}
 
       {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto pt-6 px-6 pb-60 custom-scrollbar">
         <div className="max-w-[1120px] w-full mx-auto flex flex-col space-y-6">
           {messages.length === 0 ? (
             <div className="flex-1 min-h-[60vh] flex flex-col items-center justify-center text-center max-w-md mx-auto">
