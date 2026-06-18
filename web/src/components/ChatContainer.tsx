@@ -17,7 +17,7 @@ interface ExecutionStep {
 interface ChatContainerProps {
   messages: Message[];
   isThinking: boolean;
-  thinkingText: string;
+  thinkingStep: { thought: string; tool: string; args: string } | null;
   activeStepLog: ExecutionStep[];
   setShowLogModal: (show: boolean) => void;
   messagesEndRef: RefObject<HTMLDivElement | null>;
@@ -79,7 +79,7 @@ function renderContent(text: string) {
 export default function ChatContainer({
   messages,
   isThinking,
-  thinkingText,
+  thinkingStep,
   activeStepLog,
   setShowLogModal,
   messagesEndRef,
@@ -173,13 +173,27 @@ export default function ChatContainer({
                   style={{ animation: 'rexio-spin 2s linear infinite' }}
                 />
               </div>
-              {thinkingText && (
-                <p
-                  className="mt-2 ml-1 text-xs italic text-[#6b6b68] max-w-xl leading-relaxed"
-                  style={{ animation: 'rexio-fadein 0.3s ease-out' }}
+              {thinkingStep && (
+                <div
+                  className="mt-3 ml-0.5 w-full max-w-xl border border-white/[0.06] bg-white/[0.02] rounded-xl p-3.5 space-y-2.5 font-mono text-xs"
+                  style={{ animation: 'rexio-fadein 0.25s ease-out' }}
                 >
-                  {thinkingText}
-                </p>
+                  {thinkingStep.thought && (
+                    <div>
+                      <span className="text-yellow-500 font-bold block mb-1">Thought:</span>
+                      <p className="text-gray-400 leading-relaxed whitespace-pre-wrap">{thinkingStep.thought}</p>
+                    </div>
+                  )}
+                  {thinkingStep.tool && (
+                    <div className="pt-1 border-t border-white/[0.05]">
+                      <span className="text-green-500 font-bold block mb-1">Action:</span>
+                      <div className="text-gray-300">
+                        <span className="text-[#a78bfa] font-bold">{thinkingStep.tool}</span>
+                        <span className="text-gray-500">({thinkingStep.args})</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

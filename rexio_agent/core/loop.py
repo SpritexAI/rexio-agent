@@ -193,11 +193,11 @@ class AgentSession:
                 thought, action = extract_action_and_thought(response_text)
 
                 if action:
-                    # Emit thought so the UI can show it while we run the tool
-                    if thought:
-                        yield f"data: {json.dumps({'type': 'thinking', 'text': thought})}\n\n"
-
                     tool_name, tool_args = action
+                    # Emit thought + action preview so the UI can show a live trace card
+                    if thought:
+                        yield f"data: {json.dumps({'type': 'thinking', 'thought': thought, 'tool': tool_name, 'args': str(tool_args)})}\n\n"
+
                     observation = self.registry.execute(tool_name, tool_args, execution_log=self.execution_log)
 
                     step_event = {

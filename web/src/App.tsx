@@ -42,7 +42,7 @@ export default function App() {
   const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
   const [showLogModal, setShowLogModal] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [thinkingText, setThinkingText] = useState<string>('');
+  const [thinkingStep, setThinkingStep] = useState<{ thought: string; tool: string; args: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -121,7 +121,7 @@ export default function App() {
     setInputMessage('');
     setIsThinking(true);
     setActiveStepLog([]);
-    setThinkingText('');
+    setThinkingStep(null);
 
     // Optimistically append user message
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
@@ -170,7 +170,7 @@ export default function App() {
               if (firstToken) {
                 firstToken = false;
                 setIsThinking(false);
-                setThinkingText('');
+                setThinkingStep(null);
                 setMessages((prev) => {
                   streamingIndex.current = prev.length;
                   return [...prev, { role: 'assistant', content: event.text }];
@@ -186,7 +186,7 @@ export default function App() {
                 });
               }
             } else if (event.type === 'thinking') {
-              setThinkingText(event.text);
+              setThinkingStep({ thought: event.thought || '', tool: event.tool || '', args: event.args || '' });
             } else if (event.type === 'step') {
               setActiveStepLog((prev) => [...prev, event]);
             } else if (event.type === 'done') {
@@ -240,7 +240,7 @@ export default function App() {
         <ChatContainer
           messages={messages}
           isThinking={isThinking}
-          thinkingText={thinkingText}
+          thinkingStep={thinkingStep}
           activeStepLog={activeStepLog}
           setShowLogModal={setShowLogModal}
           messagesEndRef={messagesEndRef}
