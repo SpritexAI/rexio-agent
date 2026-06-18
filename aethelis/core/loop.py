@@ -65,12 +65,12 @@ def extract_action_and_thought(text: str) -> Tuple[Optional[str], Optional[Tuple
     return thought, None
 
 class AgentSession:
-    def __init__(self, platform: str = "cli", channel_id: str = "default"):
+    def __init__(self, platform: str = "cli", channel_id: str = "default", conversation_id: Optional[str] = None):
         self.llm = LlmClient()
         self.registry = ToolRegistry()
         self.platform = platform
         self.channel_id = channel_id
-        self.conversation_id = str(uuid.uuid4())
+        self.conversation_id = conversation_id or str(uuid.uuid4())
         
         # Save new conversation to DB
         save_conversation(self.conversation_id, self.platform, self.channel_id)

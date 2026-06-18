@@ -2,8 +2,10 @@ import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
-# Load env variables from .env file
-load_dotenv(override=True)
+# Load env variables from absolute .env file path
+base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+env_path = os.path.join(base_dir, ".env")
+load_dotenv(dotenv_path=env_path, override=True)
 
 class LlmClient:
     """Wrapper class to communicate with Gemini, OpenAI, or local models."""

@@ -1,6 +1,7 @@
 import os
 import sys
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -18,7 +19,13 @@ from aethelis.db.connection import (
 )
 from aethelis.core.loop import AgentSession
 
-app = FastAPI(title="Aethelis Agent API")
+# Database initialization on startup
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+app = FastAPI(title="Aethelis Agent API", lifespan=lifespan)
 
 # Configure CORS for frontend access
 app.add_middleware(
@@ -28,11 +35,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Database initialization on startup
-@app.on_event("startup")
-def startup_event():
-    init_db()
 
 class ChatRequest(BaseModel):
     message: str
@@ -75,9 +77,11 @@ def post_chat_message(req: ChatRequest):
     # Initialize or fetch existing agent session
     if conv_id not in sessions:
         try:
-            sessions[conv_id] = AgentSession(platform=req.platform, channel_id=req.channel_id)
-            # Override generated UUID with user-provided one if needed
-            sessions[conv_id].conversation_id = conv_id
+            sessions[conv_id] = AgentSession(
+                platform=req.platform,
+                channel_id=req.channel_id,
+                conversation_id=conv_id
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to initialize session: {str(e)}")
             
