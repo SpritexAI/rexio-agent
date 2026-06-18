@@ -550,7 +550,18 @@ def run_update_wizard() -> None:
             console.print(f"[bold green]✓ Up to date![/] RexiO is already on the latest commit ([cyan]{curr_hash}[/cyan]).")
         else:
             console.print(f"📥 [yellow]Found {new_commits_count} new commit(s). Pulling updates...[/]")
-            subprocess.run(["git", "pull", "origin", "main"], cwd=install_dir, check=True)
+            # Stash any local changes so pull doesn't fail
+            stash_res = subprocess.run(
+                ["git", "stash", "--include-untracked"],
+                cwd=install_dir, capture_output=True, text=True
+            )
+            stashed = "No local changes" not in stash_res.stdout
+            try:
+                subprocess.run(["git", "pull", "origin", "main"], cwd=install_dir, check=True)
+            finally:
+                # Always restore stash if we saved something
+                if stashed:
+                    subprocess.run(["git", "stash", "pop"], cwd=install_dir, capture_output=True)
             new_hash_res = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=install_dir, capture_output=True, text=True, check=True)
             new_hash = new_hash_res.stdout.strip()
             console.print(f"[bold green]✓ Code updated successfully:[/] [cyan]{curr_hash}[/cyan] ➔ [cyan]{new_hash}[/cyan]")
