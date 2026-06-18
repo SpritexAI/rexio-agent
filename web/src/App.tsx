@@ -159,7 +159,9 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to send message to agent");
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.detail || "Failed to send message to agent";
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
@@ -170,9 +172,9 @@ export default function App() {
       // Refresh skills and conversations list (in case a new skill was learned or summary updated)
       fetchSkills();
       fetchConversations();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error sending message:", err);
-      setMessages(prev => [...prev, { role: 'system', content: "Error: Could not reach agent backend." }]);
+      setMessages(prev => [...prev, { role: 'system', content: `Error: ${err.message || "Could not reach agent backend."}` }]);
     } finally {
       setIsThinking(false);
     }
