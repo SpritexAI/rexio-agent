@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 
 from rexio_agent.core.config import DB_DIR, DB_PATH
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
+MD_SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills")
 
 def get_db_connection() -> sqlite3.Connection:
     """Returns a connection to the SQLite database with row factory enabled."""
@@ -13,6 +14,18 @@ def get_db_connection() -> sqlite3.Connection:
     # Enable foreign keys
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
+
+def _seed_default_skills() -> None:
+    """Seeds default markdown skills if none exist yet."""
+    try:
+        existing = get_markdown_skills()
+        if existing:
+            return
+        from rexio_agent.db.seed_skills import SKILLS
+        for skill in SKILLS:
+            save_markdown_skill(skill["name"], skill["description"], skill["content"])
+    except Exception:
+        pass
 
 def init_db() -> None:
     """Initializes the database using the schema.sql file."""
@@ -24,6 +37,8 @@ def init_db() -> None:
 
     with get_db_connection() as conn:
         conn.executescript(schema_sql)
+        _seed_default_skills()
+
         # Migrations for existing DBs
         migrations = [
             "ALTER TABLE messages ADD COLUMN steps_json TEXT",
@@ -145,6 +160,7 @@ def get_skill(name: str) -> Optional[Dict[str, Any]]:
 # --- Markdown Skills Helpers ---
 
 def save_markdown_skill(name: str, description: str, content: str) -> None:
+    # Save to DB
     with get_db_connection() as conn:
         conn.execute(
             """
@@ -158,18 +174,49 @@ def save_markdown_skill(name: str, description: str, content: str) -> None:
             (name, description, content)
         )
         conn.commit()
+    # Save to .md file
+    os.makedirs(MD_SKILLS_DIR, exist_ok=True)
+    md_path = os.path.join(MD_SKILLS_DIR, f"{name}.md")
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(f"---\nname: {name}\ndescription: {description}\n---\n\n{content}")
 
 def get_markdown_skills() -> List[Dict[str, Any]]:
-    with get_db_connection() as conn:
-        rows = conn.execute(
-            "SELECT name, description, content FROM markdown_skills"
-        ).fetchall()
-        return [dict(row) for row in rows]
+    """Load markdown skills — file system is source of truth, DB is index."""
+    os.makedirs(MD_SKILLS_DIR, exist_ok=True)
+    skills = []
+    # Read from .md files directly
+    for fname in sorted(os.listdir(MD_SKILLS_DIR)):
+        if not fname.endswith(".md"):
+            continue
+        fpath = os.path.join(MD_SKILLS_DIR, fname)
+        with open(fpath, "r", encoding="utf-8") as f:
+            raw = f.read()
+        # Parse frontmatter
+        name = fname[:-3]
+        description = ""
+        content = raw
+        if raw.startswith("---"):
+            parts = raw.split("---", 2)
+            if len(parts) >= 3:
+                fm = parts[1]
+                content = parts[2].strip()
+                for line in fm.splitlines():
+                    if line.startswith("name:"):
+                        name = line.split(":", 1)[1].strip()
+                    elif line.startswith("description:"):
+                        description = line.split(":", 1)[1].strip()
+        skills.append({"name": name, "description": description, "content": content})
+    return skills
 
 def delete_markdown_skill(name: str) -> None:
+    # Remove from DB
     with get_db_connection() as conn:
         conn.execute("DELETE FROM markdown_skills WHERE name = ?", (name,))
         conn.commit()
+    # Remove .md file
+    md_path = os.path.join(MD_SKILLS_DIR, f"{name}.md")
+    if os.path.exists(md_path):
+        os.remove(md_path)
 
 # --- Tasks Helpers ---
 
