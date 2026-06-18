@@ -162,8 +162,8 @@ def main():
     
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     
-    # Run setup if .env doesn't exist, if '--setup' is passed, or if keys are empty
-    should_run_setup = not os.path.exists(env_path) or (len(sys.argv) > 1 and sys.argv[1] == "--setup")
+    # Run setup wizard if configuration does not exist, if explicitly requested via 'setup' / '--setup', or if keys are empty
+    should_run_setup = not os.path.exists(env_path) or (len(sys.argv) > 1 and sys.argv[1] in ("setup", "--setup"))
     
     if not should_run_setup and os.path.exists(env_path):
         load_dotenv(env_path, override=True)
