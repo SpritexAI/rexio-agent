@@ -495,6 +495,22 @@ def run_setup_wizard(config_path: str) -> None:
     console.print(f"  [bold]Local Database:[/]   {db_status}")
     console.print("\n[bold green]🎉 Configuration saved successfully![/]\n")
 
+    # Automatically build web frontend if dist is missing and npm is available
+    web_dir = os.path.join(install_dir, "web")
+    web_dist_dir = os.path.join(web_dir, "dist")
+    if not os.path.exists(web_dist_dir):
+        import shutil
+        import subprocess
+        npm_bin = shutil.which("npm")
+        if npm_bin and os.path.exists(web_dir):
+            console.print("🌐 [yellow]First-time setup: Building web frontend dashboard...[/]")
+            try:
+                subprocess.run([npm_bin, "install"], cwd=web_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run([npm_bin, "run", "build"], cwd=web_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                console.print("[bold green]✓ Web frontend compiled successfully.[/]\n")
+            except Exception:
+                console.print("[bold red]✗ Failed to compile web frontend automatically. Headless API mode will still be available.[/]\n")
+
 def run_update_wizard() -> None:
     """Updates the RexiO Agent installation by pulling the latest code and syncing package dependencies."""
     import subprocess
@@ -571,6 +587,19 @@ def run_update_wizard() -> None:
                 subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=install_dir, check=True)
                 
         console.print("[bold green]✓ Dependencies re-installed and compiled successfully.[/]")
+        
+        # Automatically rebuild web frontend if npm is available
+        web_dir = os.path.join(install_dir, "web")
+        npm_bin = shutil.which("npm")
+        if npm_bin and os.path.exists(web_dir):
+            console.print("\n🌐 [yellow]Rebuilding web frontend dashboard...[/]")
+            try:
+                subprocess.run([npm_bin, "install"], cwd=web_dir, check=True)
+                subprocess.run([npm_bin, "run", "build"], cwd=web_dir, check=True)
+                console.print("[bold green]✓ Web frontend compiled successfully.[/]")
+            except Exception as e:
+                console.print(f"[bold red]✗ Failed to build web frontend:[/] {str(e)}")
+
         console.print("\n[bold green]🎉 RexiO Agent update complete![/]\n")
     except subprocess.CalledProcessError as e:
         console.print("[bold red]✗ Failed to compile and install package dependencies.[/]")
