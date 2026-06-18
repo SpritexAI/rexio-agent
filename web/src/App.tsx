@@ -96,7 +96,7 @@ export default function App() {
       created_at: new Date().toISOString(),
       platform: 'web',
       channel_id: 'dashboard',
-      summary: 'New conversation session',
+      summary: null,
     };
     setConversations((prev) => [newConv, ...prev]);
   };

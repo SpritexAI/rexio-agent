@@ -112,7 +112,9 @@ export default function Sidebar({
                         : 'bg-transparent border-transparent hover:bg-white/[0.04] text-[#b4b4b0] hover:text-white'
                     }`}
                   >
-                    {conv.summary || conv.id}
+                    {conv.summary && !conv.summary.startsWith('session_') && conv.summary !== 'New conversation session'
+                      ? conv.summary
+                      : 'Untitled Chat'}
                   </button>
                 );
               })

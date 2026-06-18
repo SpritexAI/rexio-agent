@@ -78,12 +78,30 @@ class AgentSession:
         # Save new conversation to DB
         save_conversation(self.conversation_id, self.platform, self.channel_id)
         
+    def _generate_summary_if_new(self, user_input: str, history: list) -> None:
+        """Generates a dynamic 3-5 word summary for the chat title on the first user query."""
+        if len(history) == 0:
+            try:
+                summary_prompt = f"Summarize the following user request into a short, descriptive 3-5 word title for a chat thread. Do not include quotes, markdown, or punctuation. Request: {user_input}"
+                summary = self.llm.generate(
+                    system_instruction="You are a helpful assistant that summarizes user prompts into short, clean titles.",
+                    prompt=summary_prompt
+                ).strip()
+                summary = summary.replace('"', '').replace("'", "")
+                if len(summary) > 40:
+                    summary = summary[:37] + "..."
+                save_conversation(self.conversation_id, self.platform, self.channel_id, summary)
+            except Exception:
+                fallback_summary = user_input[:30] + "..." if len(user_input) > 30 else user_input
+                save_conversation(self.conversation_id, self.platform, self.channel_id, fallback_summary)
+
     def run(self, user_input: str, max_steps: int = 10) -> str:
         """Executes the agent loop for a user query."""
         self.execution_log: List[Dict[str, Any]] = []
         
         # 1. Fetch history from DB
         history = get_messages(self.conversation_id)
+        self._generate_summary_if_new(user_input, history)
         save_message(self.conversation_id, "user", user_input)
         
         # Build chat history representation for LLM prompt
@@ -170,6 +188,7 @@ class AgentSession:
         self.execution_log: List[Dict[str, Any]] = []
 
         history = get_messages(self.conversation_id)
+        self._generate_summary_if_new(user_input, history)
         save_message(self.conversation_id, "user", user_input)
 
         history_prompt = ""
