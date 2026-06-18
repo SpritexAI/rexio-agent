@@ -124,13 +124,37 @@ def run_setup_wizard(env_path: str) -> None:
         current_discord_token = os.getenv("DISCORD_BOT_TOKEN", "")
         current_discord_channel_id = os.getenv("DISCORD_CHANNEL_ID", "")
 
+    provider_labels = {
+        "gemini": "Google Gemini",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "custom": "Custom Endpoint (Local / Ollama / Custom API)"
+    }
+
+    # Show active configurations
+    active_provider_label = provider_labels.get(current_provider, current_provider) if os.path.exists(env_path) else "none"
+    active_model_label = current_model if current_model else "(not set)"
+    
+    console.print(f"  [bold]Current Model:[/]    {active_model_label}")
+    console.print(f"  [bold]Active Provider:[/]  {active_provider_label}")
+    console.print()
+
     # 2. Select LLM Provider
     provider_choices = ["gemini", "openai", "openrouter", "custom"]
+    display_choices = []
     default_provider_idx = 0
-    if current_provider in provider_choices:
-        default_provider_idx = provider_choices.index(current_provider)
-        
-    provider = select_option("Select LLM Provider", provider_choices, default_idx=default_provider_idx)
+    
+    for i, p in enumerate(provider_choices):
+        label = provider_labels[p]
+        if p == current_provider and os.path.exists(env_path):
+            display_choices.append(f"{label}  ← currently active")
+            default_provider_idx = i
+        else:
+            display_choices.append(label)
+            
+    selected_display = select_option("Select LLM Provider", display_choices, default_idx=default_provider_idx)
+    selected_idx = display_choices.index(selected_display)
+    provider = provider_choices[selected_idx]
     
     # 3. Model Name
     if not current_model:
