@@ -2,10 +2,8 @@ import os
 from typing import Generator, List, Optional
 from dotenv import load_dotenv
 
-# Load env variables from absolute .env file path
-base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-env_path = os.path.join(base_dir, ".env")
-load_dotenv(dotenv_path=env_path, override=True)
+from rexio_agent.core.config import load_environment
+load_environment()
 
 class LlmClient:
     """Wrapper class to communicate with Gemini, OpenAI, or local models."""

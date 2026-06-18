@@ -12,6 +12,9 @@ from typing import List, Dict, Any
 # Ensure codebase package is on python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from rexio_agent.core.config import load_environment
+load_environment()
+
 from rexio_agent.db.connection import (
     init_db,
     get_skills,

@@ -2,8 +2,7 @@ import os
 import sqlite3
 from typing import List, Dict, Any, Optional
 
-DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
-DB_PATH = os.path.join(DB_DIR, "rexio_agent.db")
+from rexio_agent.core.config import DB_DIR, DB_PATH
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
 
 def get_db_connection() -> sqlite3.Connection:
