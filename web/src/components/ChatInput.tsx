@@ -133,19 +133,6 @@ export default function ChatInput({
           </div>
         </div>
       </div>
-
-      {/* Centered Disclaimer Footer */}
-      <div 
-        className="text-center text-zinc-500 select-text"
-        style={{
-          marginTop: '10px',
-          fontSize: '12px',
-          fontWeight: 400,
-          letterSpacing: '0.015em',
-        }}
-      >
-        Aethelis is AI and can make mistakes. Please double-check responses.
-      </div>
     </form>
   );
 }
