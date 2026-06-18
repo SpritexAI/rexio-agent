@@ -91,14 +91,6 @@ export default function App() {
     const newId = `session_${Math.random().toString(36).substr(2, 9)}`;
     setActiveConvId(newId);
     setMessages([]);
-    const newConv: Conversation = {
-      id: newId,
-      created_at: new Date().toISOString(),
-      platform: 'web',
-      channel_id: 'dashboard',
-      summary: null,
-    };
-    setConversations((prev) => [newConv, ...prev]);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
