@@ -181,6 +181,9 @@ def main():
             run_setup_wizard(env_path)
             # Re-load env configuration
             load_dotenv(env_path, override=True)
+            # If setup was explicitly requested as a CLI argument, exit after completion
+            if len(sys.argv) > 1 and sys.argv[1] in ("setup", "--setup"):
+                sys.exit(0)
         except KeyboardInterrupt:
             console.print("\n[bold yellow]Setup cancelled.[/]")
             sys.exit(1)
