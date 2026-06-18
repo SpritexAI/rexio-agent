@@ -45,8 +45,24 @@ def tool_label(tool: str, args: str) -> str:
 
     if tool == "execute_python_code":
         code = parsed.get("code", "")
+
+        # Try to extract actual shell command from subprocess/os.system calls
+        m = re.search(r'subprocess\.run\(\[([^\]]+)\]', code)
+        if m:
+            parts = [p.strip().strip("'\"") for p in m.group(1).split(",") if p.strip().strip("'\"")]
+            return f"⚙️ `{' '.join(parts)}`"
+
+        m = re.search(r'os\.system\([\'"](.+?)[\'"]\)', code)
+        if m:
+            return f"⚙️ `{m.group(1)[:60]}`"
+
+        m = re.search(r'subprocess\.check_output\(\[([^\]]+)\]', code)
+        if m:
+            parts = [p.strip().strip("'\"") for p in m.group(1).split(",") if p.strip().strip("'\"")]
+            return f"⚙️ `{' '.join(parts)}`"
+
+        # Fallback: first non-import meaningful line
         lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
-        # Skip import/from lines to find the first meaningful line
         meaningful = next(
             (l for l in lines if not l.startswith(("import ", "from ", "#"))),
             lines[0] if lines else ""
