@@ -124,7 +124,7 @@ export default function ChatContainer({
               if (isUser) {
                 return (
                   <div key={index} className="flex justify-end mb-4 pl-14 w-full">
-                    <div className="max-w-[82%] rexio-user-content bg-[#2C2C2E] text-white border border-white/[0.04] shadow-sm whitespace-pre-wrap break-words">
+                    <div className="max-w-[82%] rexio-user-content bg-[#2C2C2E] text-white border border-white/[0.04] shadow-sm whitespace-pre-wrap break-words select-text">
                       {msg.content}
                     </div>
                   </div>
@@ -152,7 +152,7 @@ export default function ChatContainer({
                   </div>
                   {/* AI Content */}
                   <div 
-                    className="rexio-ai-content pl-1 w-full text-[#f2f2f2]"
+                    className="rexio-ai-content pl-1 w-full text-[#f2f2f2] select-text"
                     dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
                   />
                 </div>
