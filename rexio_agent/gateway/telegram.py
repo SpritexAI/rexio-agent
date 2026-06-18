@@ -2,10 +2,18 @@ import os
 import json
 import logging
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from rexio_agent.core.loop import AgentSession
 from rexio_agent.db.connection import get_pending_skills, approve_skill, reject_skill
+
+BOT_COMMANDS = [
+    ("start",  "Start RexiO Agent"),
+    ("skills", "Review pending compiled skills"),
+    ("memory", "Show current memory contents"),
+    ("clear",  "Start a fresh conversation"),
+    ("status", "Check agent status"),
+]
 
 logger = logging.getLogger("rexio_agent.gateway.telegram")
 
@@ -83,8 +91,59 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target and str(chat_id) != str(target):
         return
     await update.message.reply_text(
-        "☤ Welcome to RexiO Agent! Send me any message to start."
+        "☤ Welcome to RexiO Agent!\n\n"
+        "Send any message to start chatting.\n\n"
+        "/skills — review pending skills\n"
+        "/memory — show memory\n"
+        "/clear  — fresh conversation\n"
+        "/status — agent status"
     )
+
+
+async def memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    target = os.getenv("TELEGRAM_CHAT_ID")
+    if target and str(chat_id) != str(target):
+        return
+    try:
+        from rexio_agent.core.memory_store import MemoryStore
+        store = MemoryStore()
+        store.load()
+        mem = "\n".join(store.memory_entries) if store.memory_entries else "(empty)"
+        usr = "\n".join(store.user_entries) if store.user_entries else "(empty)"
+        text = f"🧠 MEMORY:\n{mem}\n\n👤 USER PROFILE:\n{usr}"
+        await update.message.reply_text(text[:4000])
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Could not load memory: {e}")
+
+
+async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    target = os.getenv("TELEGRAM_CHAT_ID")
+    if target and str(chat_id) != str(target):
+        return
+    conv_id = f"telegram_{chat_id}"
+    if conv_id in sessions:
+        del sessions[conv_id]
+    await update.message.reply_text("🗑 Conversation cleared. Starting fresh!")
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    target = os.getenv("TELEGRAM_CHAT_ID")
+    if target and str(chat_id) != str(target):
+        return
+    import os as _os
+    model = _os.getenv("MODEL_NAME", "unknown")
+    provider = _os.getenv("MODEL_PROVIDER", "unknown")
+    pending = len(get_pending_skills())
+    text = (
+        f"✅ RexiO Agent online\n"
+        f"🤖 Model: {model}\n"
+        f"🔌 Provider: {provider}\n"
+        f"⏳ Pending skills: {pending}"
+    )
+    await update.message.reply_text(text)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -247,13 +306,25 @@ async def run_telegram_bot() -> None:
     logger.info("Initializing Telegram Gateway...")
     application = ApplicationBuilder().token(token).build()
 
-    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("start",  start_command))
     application.add_handler(CommandHandler("skills", skills_command))
+    application.add_handler(CommandHandler("memory", memory_command))
+    application.add_handler(CommandHandler("clear",  clear_command))
+    application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CallbackQueryHandler(skill_callback, pattern=r"^skill_(approve|reject):"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     await application.initialize()
     await application.start()
+
+    # Register slash command menu in Telegram
+    try:
+        bot_commands = [BotCommand(name, desc) for name, desc in BOT_COMMANDS]
+        await application.bot.set_my_commands(bot_commands)
+        logger.info("Telegram bot commands menu set (%d commands)", len(bot_commands))
+    except Exception as e:
+        logger.warning("Could not set bot commands: %s", e)
+
     await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
 
     logger.info("Telegram Gateway is online and polling for updates.")
