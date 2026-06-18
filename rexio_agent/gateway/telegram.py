@@ -109,6 +109,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     session = sessions[conv_id]
 
+    # Wire background review callback — sends notification to this chat
+    async def _review_notify(msg: str):
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=msg)
+        except Exception:
+            pass
+
+    def _sync_callback(msg: str):
+        import asyncio as _aio
+        try:
+            loop = _aio.get_event_loop()
+            loop.call_soon_threadsafe(_aio.ensure_future, _review_notify(msg))
+        except Exception:
+            pass
+
+    session.background_review_callback = _sync_callback
+
     # Send initial placeholder
     status_msg = await update.message.reply_text("☤ _Thinking..._", parse_mode="Markdown")
 

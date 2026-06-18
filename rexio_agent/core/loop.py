@@ -11,6 +11,7 @@ from rich.text import Text
 from rexio_agent.core.llm import LlmClient
 from rexio_agent.tools.registry import ToolRegistry
 from rexio_agent.core.memory_store import MemoryStore
+from rexio_agent.core.background_review import spawn_background_review
 from rexio_agent.db.connection import save_conversation, save_message, update_message_steps, get_messages
 
 SOUL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SOUL.md")
@@ -97,6 +98,9 @@ class AgentSession:
         self.memory = MemoryStore()
         self.memory.load()
         self.registry.memory_store = self.memory
+
+        # Optional callback for background review notifications (e.g. Telegram)
+        self.background_review_callback = None
 
         # Save new conversation to DB
         save_conversation(self.conversation_id, self.platform, self.channel_id)
@@ -300,6 +304,16 @@ class AgentSession:
                     if self.execution_log:
                         update_message_steps(msg_id, json.dumps(self.execution_log))
                     yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
+                    spawn_background_review(
+                        llm=self.llm,
+                        memory_store=self.memory,
+                        registry=self.registry,
+                        user_input=user_input,
+                        assistant_response=final_answer,
+                        history=history,
+                        execution_log=self.execution_log,
+                        callback=self.background_review_callback,
+                    )
                     return
 
 
@@ -310,6 +324,16 @@ class AgentSession:
                 update_message_steps(msg_id, json.dumps(self.execution_log))
             yield f"data: {json.dumps({'type': 'token', 'text': fallback})}\n\n"
             yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
+            spawn_background_review(
+                llm=self.llm,
+                memory_store=self.memory,
+                registry=self.registry,
+                user_input=user_input,
+                assistant_response=fallback,
+                history=history,
+                execution_log=self.execution_log,
+                callback=self.background_review_callback,
+            )
 
         except Exception as exc:
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
