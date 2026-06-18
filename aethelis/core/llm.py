@@ -50,6 +50,15 @@ class LlmClient:
                 base_url=self.api_base if self.api_base else None
             )
             
+        elif self.provider == "openrouter":
+            if not self.openai_key:
+                raise ValueError("OPENAI_API_KEY (used for OpenRouter) is not set in environment variables.")
+            from openai import OpenAI
+            self.openai_client = OpenAI(
+                api_key=self.openai_key,
+                base_url=self.api_base or "https://openrouter.ai/api/v1"
+            )
+            
         elif self.provider == "custom" or self.api_base:
             from openai import OpenAI
             self.openai_client = OpenAI(

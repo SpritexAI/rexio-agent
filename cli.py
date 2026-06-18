@@ -22,12 +22,17 @@ def run_setup_wizard(env_path: str) -> None:
     # 1. LLM Provider
     provider = Prompt.ask(
         "Select LLM Provider", 
-        choices=["gemini", "openai", "custom"], 
+        choices=["gemini", "openai", "openrouter", "custom"], 
         default="gemini"
     ).lower()
     
     # 2. Model Name
-    default_model = "gemini-2.5-flash" if provider == "gemini" else "gpt-4o"
+    if provider == "gemini":
+        default_model = "gemini-2.5-flash"
+    elif provider == "openrouter":
+        default_model = "google/gemini-2.5-flash"
+    else:
+        default_model = "gpt-4o"
     model_name = Prompt.ask("Enter Model Name", default=default_model)
     
     # 3. API Keys
@@ -43,9 +48,14 @@ def run_setup_wizard(env_path: str) -> None:
         openai_key = Prompt.ask("Enter your OPENAI_API_KEY (masking inputs)", password=True)
         while not openai_key.strip():
             openai_key = Prompt.ask("OPENAI_API_KEY cannot be empty. Please enter key", password=True)
+    elif provider == "openrouter":
+        openai_key = Prompt.ask("Enter your OpenRouter API Key (masking inputs)", password=True)
+        while not openai_key.strip():
+            openai_key = Prompt.ask("OpenRouter API Key cannot be empty. Please enter key", password=True)
+        api_base_url = "https://openrouter.ai/api/v1"
     else:
-        openai_key = Prompt.ask("Enter your API Key (e.g. OpenRouter or Ollama API key)", default="")
-        api_base_url = Prompt.ask("Enter custom API Base URL (e.g. https://openrouter.ai/api/v1)", default="")
+        openai_key = Prompt.ask("Enter your API Key (e.g. Ollama API key)", default="")
+        api_base_url = Prompt.ask("Enter custom API Base URL (e.g. http://localhost:11434/v1)", default="")
 
     # 4. Telegram Gateway Integration
     telegram_token = ""
