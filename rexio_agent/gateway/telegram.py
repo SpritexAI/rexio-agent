@@ -21,13 +21,9 @@ TOOL_LABELS = {
 def tool_label(tool: str, args: str) -> str:
     label = TOOL_LABELS.get(tool, f"🔧 {tool.replace('_', ' ').capitalize()}")
     if tool == "search_web":
-        try:
-            a = json.loads(args.replace("'", '"')) if args.startswith("{") else {}
-            q = a.get("query", "")
-        except Exception:
-            import re
-            m = re.search(r"query=['\"](.+?)['\"]", args)
-            q = m.group(1) if m else ""
+        import re
+        m = re.search(r"query=['\"](.+?)['\"]", args)
+        q = m.group(1) if m else ""
         if q:
             label = f'🔍 Searching "{q}"'
     return label
@@ -65,27 +61,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     session = sessions[conv_id]
 
-    # Send initial placeholder message
+    # Send initial placeholder
     status_msg = await update.message.reply_text("☤ _Thinking..._", parse_mode="Markdown")
 
+    # asyncio.Queue — bridge between sync generator thread and async handler
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def producer():
+        """Runs run_stream() in a thread, pushes each event dict into the queue."""
+        try:
+            for raw in session.run_stream(user_text):
+                raw = raw.strip()
+                if not raw.startswith("data:"):
+                    continue
+                try:
+                    event = json.loads(raw[5:].strip())
+                    loop.call_soon_threadsafe(queue.put_nowait, event)
+                except Exception:
+                    pass
+        except Exception as e:
+            loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(e)})
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, {"type": "__done__"})
+
+    # State
     completed_steps: list[str] = []
     answer_chunks: list[str] = []
-
-    def build_text(current_action: str = "", streaming_answer: str = "") -> str:
-        parts = []
-        for s in completed_steps:
-            parts.append(s)
-        if current_action:
-            parts.append(current_action)
-        if streaming_answer:
-            parts.append(f"\n{streaming_answer}")
-        return "\n".join(parts) if parts else "☤ _Thinking..._"
-
-    last_text = ""
+    last_edit = ""
 
     async def safe_edit(text: str):
-        nonlocal last_text
-        if text == last_text:
+        nonlocal last_edit
+        if text == last_edit:
             return
         try:
             await context.bot.edit_message_text(
@@ -95,12 +102,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 disable_web_page_preview=True,
             )
-            last_text = text
+            last_edit = text
         except Exception:
-            pass  # Telegram ignores edits with identical content
+            pass
 
-    current_action = ""
+    def build_status(current_action: str = "", answer: str = "") -> str:
+        parts = list(completed_steps)
+        if current_action:
+            parts.append(current_action)
+        if answer:
+            parts.append(f"\n{answer}")
+        return "\n".join(parts) or "☤ _Thinking..._"
 
+    # Typing indicator
     async def keep_typing():
         try:
             while True:
@@ -111,57 +125,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     typing_task = asyncio.ensure_future(keep_typing())
 
+    # Start producer in background thread
+    producer_task = loop.run_in_executor(None, producer)
+
+    current_action = ""
+
     try:
-        loop = asyncio.get_running_loop()
+        while True:
+            event = await queue.get()
 
-        def run_gen():
-            return list(session.run_stream(user_text))
+            if event["type"] == "__done__":
+                break
 
-        # Run generator in thread, collect all events
-        events_raw = await loop.run_in_executor(None, run_gen)
-        typing_task.cancel()
-
-        # Replay events and update Telegram message progressively
-        for raw in events_raw:
-            # raw is already a string like "data: {...}\n\n"
-            raw = raw.strip()
-            if not raw.startswith("data:"):
-                continue
-            try:
-                event = json.loads(raw[5:].strip())
-            except Exception:
-                continue
-
-            if event["type"] == "thinking":
+            elif event["type"] == "thinking":
                 current_action = f"_{tool_label(event.get('tool',''), event.get('args',''))}..._"
-                await safe_edit(build_text(current_action=current_action))
+                await safe_edit(build_status(current_action=current_action))
 
             elif event["type"] == "step":
                 label = tool_label(event.get("tool", ""), event.get("args", ""))
                 completed_steps.append(f"✅ {label}")
                 current_action = ""
-                await safe_edit(build_text())
+                await safe_edit(build_status())
 
             elif event["type"] == "token":
                 answer_chunks.append(event["text"])
-                await safe_edit(build_text(streaming_answer="".join(answer_chunks)))
-
-            elif event["type"] == "done":
-                break
+                # Debounce: edit every ~8 tokens to avoid Telegram rate limit
+                if len(answer_chunks) % 8 == 0:
+                    await safe_edit(build_status(answer="".join(answer_chunks)))
 
             elif event["type"] == "error":
-                await safe_edit(f"⚠️ Error: {event.get('message','Unknown error')}")
+                await safe_edit(f"⚠️ {event.get('message', 'Unknown error')}")
                 return
 
-        # Final clean message — just the answer
+        # Final message — just the answer
         final = "".join(answer_chunks).strip()
         if final:
             await safe_edit(final)
 
-    except Exception as e:
+    finally:
         typing_task.cancel()
-        logger.error(f"Error in agent session for chat {chat_id}: {e}")
-        await safe_edit(f"⚠️ An error occurred: {str(e)}")
+        await producer_task
 
 
 async def run_telegram_bot() -> None:
