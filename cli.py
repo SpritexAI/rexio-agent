@@ -163,18 +163,62 @@ def run_setup_wizard(config_path: str) -> None:
     selected_idx = display_choices.index(selected_display)
     provider = provider_choices[selected_idx]
     
-    # 3. Model Name
-    if not current_model:
-        if provider == "gemini":
-            default_model = "gemini-2.5-flash"
-        elif provider == "openrouter":
-            default_model = "google/gemini-2.5-flash"
-        else:
-            default_model = "gpt-4o"
+    # 3. Model Name Selection
+    model_choices = {
+        "gemini": [
+            "gemini-2.5-flash  (Fast, default model)",
+            "gemini-2.5-pro  (Highly capable, reasoning model)",
+            "gemini-1.5-flash  (Older generation flash)",
+            "gemini-1.5-pro  (Older generation pro)"
+        ],
+        "openai": [
+            "gpt-4o  (High-speed, premium multi-modal)",
+            "gpt-4o-mini  (Cost-efficient, fast model)",
+            "o1  (Advanced reasoning model)",
+            "o1-mini  (Fast reasoning model)"
+        ],
+        "openrouter": [
+            "google/gemini-2.5-flash  (Recommended flash)",
+            "google/gemini-2.5-pro  (Recommended pro)",
+            "openai/gpt-4o  (GPT-4o on OpenRouter)",
+            "anthropic/claude-3.5-sonnet  (Claude 3.5 Sonnet)"
+        ],
+        "custom": [
+            "llama3  (Meta Llama 3)",
+            "qwen2.5-coder  (Qwen 2.5 Coder)",
+            "mistral  (Mistral 7B)",
+            "phi3  (Microsoft Phi 3)"
+        ]
+    }
+
+    choices = model_choices.get(provider, []).copy()
+    manual_option = "Enter model name manually..."
+    choices.append(manual_option)
+    
+    default_model_idx = 0
+    if current_model:
+        found_match = False
+        for i, choice in enumerate(choices):
+            # Split by double space to extract raw model name
+            choice_clean = choice.split("  ")[0].strip()
+            if choice_clean == current_model:
+                choices[i] = f"{choice_clean}  ← currently active"
+                default_model_idx = i
+                found_match = True
+                break
+        if not found_match:
+            choices.insert(0, f"{current_model}  ← currently active")
+            default_model_idx = 0
+            
+    selected_model_display = select_option("Select Model", choices, default_idx=default_model_idx)
+    
+    if selected_model_display == manual_option:
+        model_name = Prompt.ask("Enter Model Name").strip()
+        while not model_name:
+            model_name = Prompt.ask("Model Name cannot be empty. Please enter name").strip()
     else:
-        default_model = current_model
-        
-    model_name = Prompt.ask("Enter Model Name", default=default_model)
+        # Parse the raw model identifier
+        model_name = selected_model_display.split("  ")[0].strip()
     
     # 4. API Credentials Configuration
     gemini_key = ""
