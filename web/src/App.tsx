@@ -2,9 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatContainer from './components/ChatContainer';
 import ChatInput from './components/ChatInput';
-import SkillsHub from './components/SkillsHub';
 import TraceModal from './components/TraceModal';
-import SkillModal from './components/SkillModal';
 
 interface Message {
   role: string;
@@ -18,13 +16,6 @@ interface Conversation {
   platform: string;
   channel_id: string;
   summary: string | null;
-}
-
-interface Skill {
-  name: string;
-  description: string;
-  code: string;
-  created_at: string;
 }
 
 interface ExecutionStep {
@@ -42,7 +33,6 @@ export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string>('default_web_session');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [skills, setSkills] = useState<Skill[]>([]);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const [backendStatus, setBackendStatus] = useState<{ status: string; model: string }>({
@@ -51,7 +41,6 @@ export default function App() {
   });
   const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
   const [showLogModal, setShowLogModal] = useState<boolean>(false);
-  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +48,6 @@ export default function App() {
   useEffect(() => {
     fetchStatus();
     fetchConversations();
-    fetchSkills();
   }, []);
 
   // Fetch messages when active conversation changes
@@ -104,16 +92,6 @@ export default function App() {
       setMessages(data.messages || []);
     } catch (err) {
       console.error('Error fetching messages:', err);
-    }
-  };
-
-  const fetchSkills = async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/skills`);
-      const data = await res.json();
-      setSkills(data.skills || []);
-    } catch (err) {
-      console.error('Error fetching skills:', err);
     }
   };
 
@@ -168,8 +146,7 @@ export default function App() {
       if (data.execution_log) {
         setActiveStepLog(data.execution_log);
       }
-      // Refresh skills and conversations list
-      fetchSkills();
+      // Refresh conversations list
       fetchConversations();
     } catch (err: any) {
       console.error('Error sending message:', err);
@@ -212,17 +189,9 @@ export default function App() {
         />
       </div>
 
-      {/* 3. Right Sidebar: Skills Inventory */}
-      <SkillsHub skills={skills} setSelectedSkill={setSelectedSkill} />
-
       {/* Trace Log Modal */}
       {showLogModal && (
         <TraceModal activeStepLog={activeStepLog} setShowLogModal={setShowLogModal} />
-      )}
-
-      {/* Skill Detail View Modal */}
-      {selectedSkill && (
-        <SkillModal selectedSkill={selectedSkill} setSelectedSkill={setSelectedSkill} />
       )}
     </div>
   );
