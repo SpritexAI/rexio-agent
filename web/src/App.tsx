@@ -3,6 +3,12 @@ import Sidebar from './components/Sidebar';
 import ChatContainer from './components/ChatContainer';
 import ChatInput from './components/ChatInput';
 import TraceModal from './components/TraceModal';
+import RexioLiveLogsModal, {
+  type LiveLogEntry,
+  makeThinkingEntries,
+  makeObservationEntry,
+  makeSeparatorEntry,
+} from './components/RexioLiveLogsModal';
 
 interface Message {
   role: string;
@@ -43,6 +49,9 @@ export default function App() {
   const [showLogModal, setShowLogModal] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [thinkingStep, setThinkingStep] = useState<{ thought: string; tool: string; args: string } | null>(null);
+  const [liveLog, setLiveLog] = useState<LiveLogEntry[]>([]);
+  const [showLiveLog, setShowLiveLog] = useState<boolean>(false);
+  const logIdRef = useRef<{ current: number }>({ current: 0 });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -122,6 +131,8 @@ export default function App() {
     setIsThinking(true);
     setActiveStepLog([]);
     setThinkingStep(null);
+    setLiveLog([]);
+    logIdRef.current = { current: 0 };
 
     // Optimistically append user message
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
@@ -187,8 +198,13 @@ export default function App() {
               }
             } else if (event.type === 'thinking') {
               setThinkingStep({ thought: event.thought || '', tool: event.tool || '', args: event.args || '' });
+              const entries = makeThinkingEntries(event.thought || '', event.tool || '', event.args || '', logIdRef.current);
+              setLiveLog((prev) => [...prev, ...entries]);
             } else if (event.type === 'step') {
               setActiveStepLog((prev) => [...prev, event]);
+              const obs = makeObservationEntry(event.observation || '', logIdRef.current);
+              const sep = makeSeparatorEntry(logIdRef.current);
+              setLiveLog((prev) => [...prev, obs, sep]);
             } else if (event.type === 'done') {
               if (event.execution_log) setActiveStepLog(event.execution_log);
               fetchConversations();
@@ -243,6 +259,7 @@ export default function App() {
           thinkingStep={thinkingStep}
           activeStepLog={activeStepLog}
           setShowLogModal={setShowLogModal}
+          onOpenLiveLogs={() => setShowLiveLog(true)}
           messagesEndRef={messagesEndRef}
         />
         
@@ -262,6 +279,15 @@ export default function App() {
       {/* Trace Log Modal */}
       {showLogModal && (
         <TraceModal activeStepLog={activeStepLog} setShowLogModal={setShowLogModal} />
+      )}
+
+      {/* RexiO Live Logs Modal */}
+      {showLiveLog && (
+        <RexioLiveLogsModal
+          entries={liveLog}
+          isStreaming={isThinking}
+          onClose={() => setShowLiveLog(false)}
+        />
       )}
     </div>
   );

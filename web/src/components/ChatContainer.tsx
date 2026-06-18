@@ -20,6 +20,7 @@ interface ChatContainerProps {
   thinkingStep: { thought: string; tool: string; args: string } | null;
   activeStepLog: ExecutionStep[];
   setShowLogModal: (show: boolean) => void;
+  onOpenLiveLogs: () => void;
   messagesEndRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -82,6 +83,7 @@ export default function ChatContainer({
   thinkingStep,
   activeStepLog,
   setShowLogModal,
+  onOpenLiveLogs,
   messagesEndRef,
 }: ChatContainerProps) {
   return (
@@ -162,16 +164,31 @@ export default function ChatContainer({
 
           {isThinking && (
             <div className="flex flex-col items-start mb-6 px-1 w-full">
-              <div
-                className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none"
-                style={{ animation: 'rexio-pulse-scale 0.8s ease-in-out infinite' }}
-              >
-                <img
-                  src="/rexio_core_icon.svg"
-                  alt="RexiO"
-                  className="w-7 h-7"
-                  style={{ animation: 'rexio-spin 2s linear infinite' }}
-                />
+              {/* Icon row + Live Logs button */}
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none"
+                  style={{ animation: 'rexio-pulse-scale 0.8s ease-in-out infinite' }}
+                >
+                  <img
+                    src="/rexio_core_icon.svg"
+                    alt="RexiO"
+                    className="w-7 h-7"
+                    style={{ animation: 'rexio-spin 2s linear infinite' }}
+                  />
+                </div>
+                <button
+                  onClick={onOpenLiveLogs}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all duration-150 select-none"
+                  style={{
+                    background: 'rgba(139,92,246,0.08)',
+                    border: '1px solid rgba(139,92,246,0.2)',
+                    color: '#a78bfa',
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Live Logs
+                </button>
               </div>
               {thinkingStep && (
                 <div
