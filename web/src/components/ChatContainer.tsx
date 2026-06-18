@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { Cpu, Terminal } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 
 interface Message {
   role: string;
@@ -102,8 +102,12 @@ export default function ChatContainer({
         <div className="max-w-[1120px] w-full mx-auto flex flex-col space-y-6">
           {messages.length === 0 ? (
             <div className="flex-1 min-h-[60vh] flex flex-col items-center justify-center text-center max-w-md mx-auto">
-              <div className="p-4 bg-[#8b5cf6]/10 text-[#8b5cf6] rounded-full border border-[#8b5cf6]/10 mb-4 animate-bounce">
-                <Cpu size={36} />
+              <div className="mb-5">
+                <img
+                  src="/rexio_core_icon.svg"
+                  alt="RexiO"
+                  className="w-14 h-14 opacity-90 drop-shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                />
               </div>
               <h3 className="text-lg font-semibold text-white">Ask RexiO Agent anything</h3>
               <p className="text-sm text-[#8a8a85] mt-2">
@@ -137,9 +141,12 @@ export default function ChatContainer({
               
               return (
                 <div key={index} className="flex flex-col items-start mb-6 px-1 w-full">
-                  {/* Premium Branded badge (No bg/border, matching RexiO) */}
                   <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none mb-2">
-                    <Cpu size={22} className="text-[#8b5cf6]" />
+                    <img
+                      src="/rexio_core_icon.svg"
+                      alt="RexiO"
+                      className="w-7 h-7 opacity-95"
+                    />
                   </div>
                   {/* AI Content */}
                   <div 
@@ -153,8 +160,12 @@ export default function ChatContainer({
 
           {isThinking && (
             <div className="flex flex-col items-start mb-6 px-1 w-full">
-              <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none mb-2 animate-pulse">
-                <Cpu size={22} className="text-[#8b5cf6]" />
+              <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none mb-2">
+                <img
+                  src="/rexio_core_icon.svg"
+                  alt="RexiO"
+                  className="w-7 h-7 opacity-95 animate-pulse"
+                />
               </div>
               <div className="flex items-center space-x-3 bg-white/[0.03] border border-white/[0.08] text-gray-200 rounded-2xl rounded-tl-sm py-3 px-4 max-w-md">
                 <div className="flex space-x-1.5">
