@@ -194,7 +194,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white flex items-center">
-                Authelis Agent <span className="text-xs text-indigo-400 ml-1.5 font-mono">☤</span>
+                Aethelis Agent <span className="text-xs text-indigo-400 ml-1.5 font-mono">☤</span>
               </h1>
               <p className="text-[10px] text-gray-500 font-mono">PERSISTENT FRAMEWORK</p>
             </div>
