@@ -91,6 +91,28 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+.rexio-link {
+  color: #a78bfa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+.rexio-link:hover {
+  color: #c4b5fd;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ── MessageBubble Markdown / Text Styling ── */
 .rexio-user-content {
   font-size: var(--bubble-font-user) !important;

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id TEXT NOT NULL,
     role TEXT NOT NULL,             -- 'user', 'assistant', 'system'
     content TEXT NOT NULL,
+    steps_json TEXT,                -- JSON array of ReAct steps (thought/tool/args/observation)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );

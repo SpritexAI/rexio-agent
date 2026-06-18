@@ -112,8 +112,10 @@ class LlmClient:
                 stop=stop_sequences,
                 temperature=0.2
             )
+            if not response.choices:
+                raise ValueError(f"Model returned empty choices. Response: {getattr(response, 'error', response)}")
             return response.choices[0].message.content or ""
-            
+
         else:
             raise ValueError("No API client initialized. Check your credentials.")
 
@@ -149,6 +151,8 @@ class LlmClient:
                 stream=True,
             )
             for chunk in stream:
+                if not chunk.choices:
+                    continue
                 delta = chunk.choices[0].delta.content
                 if delta:
                     yield delta

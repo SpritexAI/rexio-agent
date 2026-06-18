@@ -2,17 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatContainer from './components/ChatContainer';
 import ChatInput from './components/ChatInput';
-import TraceModal from './components/TraceModal';
-import RexioLiveLogsModal, {
-  type LiveLogEntry,
-  makeThinkingEntries,
-  makeObservationEntry,
-  makeSeparatorEntry,
-} from './components/RexioLiveLogsModal';
+import { type ExecutionStep } from './components/StepsSummaryModal';
 
 interface Message {
   role: string;
   content: string;
+  steps?: ExecutionStep[];
   created_at?: string;
 }
 
@@ -22,13 +17,6 @@ interface Conversation {
   platform: string;
   channel_id: string;
   summary: string | null;
-}
-
-interface ExecutionStep {
-  thought: string;
-  tool: string;
-  args: string;
-  observation: string;
 }
 
 const BACKEND_URL = window.location.port === '5173'
@@ -45,30 +33,23 @@ export default function App() {
     status: 'offline',
     model: '-',
   });
-  const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
-  const [showLogModal, setShowLogModal] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [thinkingStep, setThinkingStep] = useState<{ thought: string; tool: string; args: string } | null>(null);
-  const [liveLog, setLiveLog] = useState<LiveLogEntry[]>([]);
-  const [showLiveLog, setShowLiveLog] = useState<boolean>(false);
-  const logIdRef = useRef<{ current: number }>({ current: 0 });
+  const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch initial data
   useEffect(() => {
     fetchStatus();
     fetchConversations();
   }, []);
 
-  // Fetch messages when active conversation changes
   useEffect(() => {
     if (activeConvId) {
       fetchMessages(activeConvId);
     }
   }, [activeConvId]);
 
-  // Scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
@@ -110,8 +91,6 @@ export default function App() {
     const newId = `session_${Math.random().toString(36).substr(2, 9)}`;
     setActiveConvId(newId);
     setMessages([]);
-    setActiveStepLog([]);
-    // Insert a dummy conversation in state for instant UI update
     const newConv: Conversation = {
       id: newId,
       created_at: new Date().toISOString(),
@@ -129,15 +108,11 @@ export default function App() {
     const userText = inputMessage;
     setInputMessage('');
     setIsThinking(true);
-    setActiveStepLog([]);
     setThinkingStep(null);
-    setLiveLog([]);
-    logIdRef.current = { current: 0 };
+    setActiveStepLog([]);
 
-    // Optimistically append user message
     setMessages((prev) => [...prev, { role: 'user', content: userText }]);
 
-    // Track whether the assistant message row has been created yet
     const streamingIndex = { current: -1 };
     let firstToken = true;
 
@@ -198,15 +173,25 @@ export default function App() {
               }
             } else if (event.type === 'thinking') {
               setThinkingStep({ thought: event.thought || '', tool: event.tool || '', args: event.args || '' });
-              const entries = makeThinkingEntries(event.thought || '', event.tool || '', event.args || '', logIdRef.current);
-              setLiveLog((prev) => [...prev, ...entries]);
             } else if (event.type === 'step') {
-              setActiveStepLog((prev) => [...prev, event]);
-              const obs = makeObservationEntry(event.observation || '', logIdRef.current);
-              const sep = makeSeparatorEntry(logIdRef.current);
-              setLiveLog((prev) => [...prev, obs, sep]);
+              setActiveStepLog((prev) => [...prev, {
+                thought: event.thought || '',
+                tool: event.tool || '',
+                args: event.args || '',
+                observation: event.observation || '',
+              }]);
             } else if (event.type === 'done') {
-              if (event.execution_log) setActiveStepLog(event.execution_log);
+              if (event.execution_log) {
+                setActiveStepLog(event.execution_log);
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const idx = streamingIndex.current;
+                  if (idx >= 0 && updated[idx]) {
+                    updated[idx] = { ...updated[idx], steps: event.execution_log };
+                  }
+                  return updated;
+                });
+              }
               fetchConversations();
             } else if (event.type === 'error') {
               throw new Error(event.message);
@@ -227,11 +212,9 @@ export default function App() {
     }
   };
 
-
-
   return (
     <div className="flex h-screen w-screen bg-[#1f1f1e] text-gray-200 overflow-hidden font-sans select-none relative">
-      <div 
+      <div
         className="fixed inset-0 -z-10 w-full h-full pointer-events-none"
         style={{
           backgroundColor: '#1f1f1e',
@@ -239,7 +222,6 @@ export default function App() {
           backgroundSize: '32px 32px',
         }}
       />
-      {/* 1. Left Sidebar: Sessions & Status */}
       <Sidebar
         conversations={conversations}
         activeConvId={activeConvId}
@@ -251,19 +233,15 @@ export default function App() {
         setIsOpen={setIsSidebarOpen}
       />
 
-      {/* 2. Middle Panel: Chat Window & Input Bar */}
       <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
         <ChatContainer
           messages={messages}
           isThinking={isThinking}
           thinkingStep={thinkingStep}
           activeStepLog={activeStepLog}
-          setShowLogModal={setShowLogModal}
-          onOpenLiveLogs={() => setShowLiveLog(true)}
           messagesEndRef={messagesEndRef}
         />
-        
-        {/* Floating Input Box Wrapper with gradient background to fade messages */}
+
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1f1f1e] via-[#1f1f1e]/90 to-transparent pt-12 pb-0 z-10 pointer-events-none">
           <div className="pointer-events-auto w-full">
             <ChatInput
@@ -275,20 +253,6 @@ export default function App() {
           </div>
         </div>
       </div>
-
-      {/* Trace Log Modal */}
-      {showLogModal && (
-        <TraceModal activeStepLog={activeStepLog} setShowLogModal={setShowLogModal} />
-      )}
-
-      {/* RexiO Live Logs Modal */}
-      {showLiveLog && (
-        <RexioLiveLogsModal
-          entries={liveLog}
-          isStreaming={isThinking}
-          onClose={() => setShowLiveLog(false)}
-        />
-      )}
     </div>
   );
 }

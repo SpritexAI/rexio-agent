@@ -1,17 +1,12 @@
-import type { RefObject } from 'react';
-import { Terminal } from 'lucide-react';
+import { useState, type RefObject } from 'react';
+import { Clock, ChevronRight } from 'lucide-react';
+import StepsSummaryModal, { type ExecutionStep } from './StepsSummaryModal';
 
 interface Message {
   role: string;
   content: string;
+  steps?: ExecutionStep[];
   created_at?: string;
-}
-
-interface ExecutionStep {
-  thought: string;
-  tool: string;
-  args: string;
-  observation: string;
 }
 
 interface ChatContainerProps {
@@ -19,8 +14,6 @@ interface ChatContainerProps {
   isThinking: boolean;
   thinkingStep: { thought: string; tool: string; args: string } | null;
   activeStepLog: ExecutionStep[];
-  setShowLogModal: (show: boolean) => void;
-  onOpenLiveLogs: () => void;
   messagesEndRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -32,6 +25,22 @@ function renderContent(text: string) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+  // Extract fenced code blocks: ```lang ... ```
+  const codeBlocks: string[] = [];
+  escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, __, code) => {
+    const placeholder = `__CODE_BLOCK_PLACEHOLDER_${codeBlocks.length}__`;
+    codeBlocks.push(`<pre class="rexio-code-block"><code>${code.trim()}</code></pre>`);
+    return placeholder;
+  });
+
+  // Extract inline code: `code`
+  const inlineCodes: string[] = [];
+  escaped = escaped.replace(/`([^`\n]+)`/g, (_, code) => {
+    const placeholder = `__INLINE_CODE_PLACEHOLDER_${inlineCodes.length}__`;
+    inlineCodes.push(`<code class="rexio-inline-code">${code}</code>`);
+    return placeholder;
+  });
 
   // Table support (matching RexiO)
   escaped = escaped.replace(/^(\|.+\|\n)((\|[-| :]+\|\n))((\|.+\|\n?)*)/gm, (match) => {
@@ -47,14 +56,6 @@ function renderContent(text: string) {
     return `<table class="rexio-table">${thead}${tbody}</table>`;
   });
 
-  // Fenced code blocks: ```lang ... ```
-  escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, __, code) => {
-    return `<pre class="rexio-code-block"><code>${code.trim()}</code></pre>`;
-  });
-
-  // Inline code: `code`
-  escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="rexio-inline-code">$1</code>');
-
   // Bold: **text**
   escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
 
@@ -67,8 +68,28 @@ function renderContent(text: string) {
   escaped = escaped.replace(/^[-*] (.+)/gm, '<li class="rexio-li">$1</li>');
   escaped = escaped.replace(/(<li class="rexio-li">.*<\/li>\n?)+/g, match => `<ul class="rexio-ul">${match}</ul>`);
 
+  // Markdown links: [text](url)
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, text, url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="rexio-link">${text}</a>`;
+  });
+
+  // Plain URLs (not already inside an href)
+  escaped = escaped.replace(/(?<!href=")https?:\/\/[^\s<>"&,)]+/g, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="rexio-link">${url}</a>`;
+  });
+
   // Convert newlines to breaks
   escaped = escaped.replace(/\n/g, '<br/>');
+
+  // Restore inline code blocks
+  inlineCodes.forEach((html, i) => {
+    escaped = escaped.replace(new RegExp(`__INLINE_CODE_PLACEHOLDER_${i}__`, 'g'), html);
+  });
+
+  // Restore fenced code blocks
+  codeBlocks.forEach((html, i) => {
+    escaped = escaped.replace(new RegExp(`__CODE_BLOCK_PLACEHOLDER_${i}__`, 'g'), html);
+  });
 
   // Clean up double spacing next to block tags
   escaped = escaped.replace(/<br\/>(?=<\/?(ul|li|table|thead|tbody|tr|th|td|pre|code|h1|h2|h3))/g, '');
@@ -77,30 +98,38 @@ function renderContent(text: string) {
   return escaped;
 }
 
+function getChipLabel(steps: ExecutionStep[]): string {
+  const last = steps[steps.length - 1];
+  if (!last) return 'View steps';
+  if (/web_search|search_web/i.test(last.tool)) {
+    const m = last.args.match(/query=["'](.+?)["']/);
+    return m ? `Searched "${m[1]}"` : 'Web search';
+  }
+  if (/read_file/i.test(last.tool)) {
+    const m = last.args.match(/path=["'](.+?)["']/);
+    return m ? `Read ${m[1].split('/').pop()}` : 'Read file';
+  }
+  if (/write_file/i.test(last.tool)) {
+    const m = last.args.match(/path=["'](.+?)["']/);
+    return m ? `Wrote ${m[1].split('/').pop()}` : 'Wrote file';
+  }
+  if (/execute_python|run_python/i.test(last.tool)) return 'Executed code';
+  return last.tool.replace(/_/g, ' ');
+}
+
 export default function ChatContainer({
   messages,
   isThinking,
   thinkingStep,
   activeStepLog,
-  setShowLogModal,
-  onOpenLiveLogs,
   messagesEndRef,
 }: ChatContainerProps) {
-  return (
-    <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
-      {/* Top Chat Header */}
-      {activeStepLog.length > 0 && (
-        <div className="h-14 px-9 flex items-center justify-end bg-transparent flex-shrink-0">
-          <button
-            onClick={() => setShowLogModal(true)}
-            className="flex items-center space-x-1.5 py-1.5 px-3 bg-[#8b5cf6]/10 border border-[#8b5cf6]/25 text-[#a78bfa] hover:bg-[#8b5cf6]/20 rounded-lg text-xs font-mono transition-all duration-150"
-          >
-            <Terminal size={14} />
-            <span>Trace Log ({activeStepLog.length} steps)</span>
-          </button>
-        </div>
-      )}
+  const [selectedSteps, setSelectedSteps] = useState<ExecutionStep[] | null>(null);
+  const [showLive, setShowLive] = useState(false);
 
+  return (
+    <>
+    <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
       {/* Messages Stream */}
       <div className="flex-1 overflow-y-auto pt-6 px-6 pb-60 custom-scrollbar">
         <div className="max-w-[1120px] w-full mx-auto flex flex-col space-y-6">
@@ -143,17 +172,31 @@ export default function ChatContainer({
                 );
               }
               
+              const hasSteps = msg.steps && msg.steps.length > 0;
               return (
                 <div key={index} className="flex flex-col items-start mb-6 px-1 w-full">
-                  <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none mb-2">
-                    <img
-                      src="/rexio_core_icon.svg"
-                      alt="RexiO"
-                      className="w-7 h-7 opacity-95"
-                    />
+                  {/* Icon row + steps chip side by side */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none">
+                      <img
+                        src="/rexio_core_icon.svg"
+                        alt="RexiO"
+                        className="w-7 h-7 opacity-95"
+                      />
+                    </div>
+                    {hasSteps && (
+                      <button
+                        onClick={() => setSelectedSteps(msg.steps!)}
+                        className="flex items-center gap-1.5 text-[#666] hover:text-[#999] transition-colors text-xs select-none"
+                      >
+                        <Clock size={11} />
+                        <span className="truncate max-w-[260px]">{getChipLabel(msg.steps!)}</span>
+                        <ChevronRight size={11} />
+                      </button>
+                    )}
                   </div>
                   {/* AI Content */}
-                  <div 
+                  <div
                     className="rexio-ai-content pl-1 w-full text-[#f2f2f2] select-text"
                     dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
                   />
@@ -164,7 +207,6 @@ export default function ChatContainer({
 
           {isThinking && (
             <div className="flex flex-col items-start mb-6 px-1 w-full">
-              {/* Icon row + Live Logs button */}
               <div className="flex items-center gap-3">
                 <div
                   className="w-9 h-9 flex items-center justify-center flex-shrink-0 select-none"
@@ -177,46 +219,44 @@ export default function ChatContainer({
                     style={{ animation: 'rexio-spin 2s linear infinite' }}
                   />
                 </div>
-                <button
-                  onClick={onOpenLiveLogs}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all duration-150 select-none"
-                  style={{
-                    background: 'rgba(139,92,246,0.08)',
-                    border: '1px solid rgba(139,92,246,0.2)',
-                    color: '#a78bfa',
-                  }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  Live Logs
-                </button>
+                {thinkingStep?.tool && (
+                  <button
+                    onClick={() => setShowLive(true)}
+                    className="flex items-center gap-1.5 text-[#666] hover:text-[#999] transition-colors text-xs select-none"
+                    style={{ animation: 'rexio-fadein 0.2s ease-out' }}
+                  >
+                    <Clock size={11} />
+                    <span className="truncate max-w-[260px]">{getChipLabel([{ thought: thinkingStep.thought, tool: thinkingStep.tool, args: thinkingStep.args, observation: '' }])}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+                  </button>
+                )}
               </div>
-              {thinkingStep && (
-                <div
-                  className="mt-3 ml-0.5 w-full max-w-xl border border-white/[0.06] bg-white/[0.02] rounded-xl p-3.5 space-y-2.5 font-mono text-xs"
-                  style={{ animation: 'rexio-fadein 0.25s ease-out' }}
-                >
-                  {thinkingStep.thought && (
-                    <div>
-                      <span className="text-yellow-500 font-bold block mb-1">Thought:</span>
-                      <p className="text-gray-400 leading-relaxed whitespace-pre-wrap">{thinkingStep.thought}</p>
-                    </div>
-                  )}
-                  {thinkingStep.tool && (
-                    <div className="pt-1 border-t border-white/[0.05]">
-                      <span className="text-green-500 font-bold block mb-1">Action:</span>
-                      <div className="text-gray-300">
-                        <span className="text-[#a78bfa] font-bold">{thinkingStep.tool}</span>
-                        <span className="text-gray-500">({thinkingStep.args})</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
       </div>
     </div>
+
+    {selectedSteps && (
+      <StepsSummaryModal
+        steps={selectedSteps}
+        onClose={() => setSelectedSteps(null)}
+      />
+    )}
+
+    {showLive && (() => {
+      const liveSteps: ExecutionStep[] = [
+        ...activeStepLog,
+        ...(thinkingStep?.tool ? [{ thought: thinkingStep.thought, tool: thinkingStep.tool, args: thinkingStep.args, observation: '...' }] : []),
+      ];
+      return liveSteps.length > 0 ? (
+        <StepsSummaryModal
+          steps={liveSteps}
+          onClose={() => setShowLive(false)}
+        />
+      ) : null;
+    })()}
+    </>
   );
 }

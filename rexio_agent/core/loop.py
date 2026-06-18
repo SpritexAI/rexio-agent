@@ -9,12 +9,14 @@ from rich.text import Text
 
 from rexio_agent.core.llm import LlmClient
 from rexio_agent.tools.registry import ToolRegistry
-from rexio_agent.db.connection import save_conversation, save_message, get_messages
+from rexio_agent.db.connection import save_conversation, save_message, update_message_steps, get_messages
 
 console = Console()
 
-SYSTEM_INSTRUCTION_TEMPLATE = """You are RexiO Agent, an advanced, self-improving, persistent AI agent framework. 
+SYSTEM_INSTRUCTION_TEMPLATE = """You are RexiO Agent, an advanced, self-improving, persistent AI agent framework.
 You think steps through, select tools to interact with the system or search the web, learn from results, and compile reusable functions.
+
+Today's date and time: {current_datetime}
 
 You must follow the ReAct flow:
 1. Thought: Reason about what you need to do next.
@@ -92,8 +94,10 @@ class AgentSession:
         history_prompt += f"User: {user_input}\n"
         
         # Prepare system instruction
+        from datetime import datetime
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
-            tool_definitions=self.registry.get_tool_definitions()
+            tool_definitions=self.registry.get_tool_definitions(),
+            current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
         )
         
         # Start ReAct trace
@@ -149,7 +153,9 @@ class AgentSession:
         if not final_answer:
             final_answer = "Sorry, I could not complete the request within the step limit."
             
-        save_message(self.conversation_id, "assistant", final_answer)
+        msg_id = save_message(self.conversation_id, "assistant", final_answer)
+        if self.execution_log:
+            update_message_steps(msg_id, json.dumps(self.execution_log))
         return final_answer
 
     def run_stream(self, user_input: str, max_steps: int = 10) -> Generator[str, None, None]:
@@ -172,8 +178,10 @@ class AgentSession:
             history_prompt += f"{role_label}: {msg['content']}\n"
         history_prompt += f"User: {user_input}\n"
 
+        from datetime import datetime
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
-            tool_definitions=self.registry.get_tool_definitions()
+            tool_definitions=self.registry.get_tool_definitions(),
+            current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
         )
 
         trace = history_prompt + "\nAssistant:\n"
@@ -240,14 +248,18 @@ class AgentSession:
                         final_answer = "Sorry, I could not complete the request within the step limit."
                         yield f"data: {json.dumps({'type': 'token', 'text': final_answer})}\n\n"
 
-                    save_message(self.conversation_id, "assistant", final_answer)
+                    msg_id = save_message(self.conversation_id, "assistant", final_answer)
+                    if self.execution_log:
+                        update_message_steps(msg_id, json.dumps(self.execution_log))
                     yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
                     return
 
 
             # Exhausted max steps without a final answer
             fallback = "Sorry, I could not complete the request within the step limit."
-            save_message(self.conversation_id, "assistant", fallback)
+            msg_id = save_message(self.conversation_id, "assistant", fallback)
+            if self.execution_log:
+                update_message_steps(msg_id, json.dumps(self.execution_log))
             yield f"data: {json.dumps({'type': 'token', 'text': fallback})}\n\n"
             yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
 

@@ -19,13 +19,18 @@ def init_db() -> None:
     """Initializes the database using the schema.sql file."""
     if not os.path.exists(SCHEMA_PATH):
         raise FileNotFoundError(f"Schema file not found at {SCHEMA_PATH}")
-    
+
     with open(SCHEMA_PATH, "r") as f:
         schema_sql = f.read()
-    
+
     with get_db_connection() as conn:
         conn.executescript(schema_sql)
-        conn.commit()
+        # Migration: add steps_json column to existing DBs
+        try:
+            conn.execute("ALTER TABLE messages ADD COLUMN steps_json TEXT")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
 
 # --- Conversation & Message Helpers ---
 
@@ -42,21 +47,36 @@ def save_conversation(conv_id: str, platform: str, channel_id: str, summary: Opt
         )
         conn.commit()
 
-def save_message(conv_id: str, role: str, content: str) -> None:
+def save_message(conv_id: str, role: str, content: str) -> int:
     with get_db_connection() as conn:
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
             (conv_id, role, content)
         )
         conn.commit()
+        return cursor.lastrowid
+
+def update_message_steps(msg_id: int, steps_json: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE messages SET steps_json = ? WHERE id = ?",
+            (steps_json, msg_id)
+        )
+        conn.commit()
 
 def get_messages(conv_id: str) -> List[Dict[str, Any]]:
+    import json as _json
     with get_db_connection() as conn:
         rows = conn.execute(
-            "SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id ASC",
+            "SELECT role, content, steps_json, created_at FROM messages WHERE conversation_id = ? ORDER BY id ASC",
             (conv_id,)
         ).fetchall()
-        return [dict(row) for row in rows]
+        result = []
+        for row in rows:
+            r = dict(row)
+            r["steps"] = _json.loads(r.pop("steps_json")) if r.get("steps_json") else []
+            result.append(r)
+        return result
 
 # --- Skills Helpers ---
 
