@@ -193,6 +193,8 @@ class AgentSession:
                 final_match = re.search(r'Final Answer:\s*(.*)', response_text, re.DOTALL)
                 if final_match:
                     final_answer = final_match.group(1).strip()
+                    # Strip any accidental nested "Final Answer:" prefix
+                    final_answer = re.sub(r'^Final Answer:\s*', '', final_answer, flags=re.IGNORECASE).strip()
                 else:
                     # Fallback if no specific format was matched
                     final_answer = response_text.replace("Assistant:", "").strip()
@@ -278,6 +280,8 @@ class AgentSession:
                         # Model already produced the full answer — stream it word-by-word
                         # without a second LLM call to avoid re-running the ReAct loop.
                         final_answer = final_match.group(1).strip()
+                        # Strip any accidental nested "Final Answer:" prefix
+                        final_answer = re.sub(r'^Final Answer:\s*', '', final_answer, flags=re.IGNORECASE).strip()
                         words = final_answer.split(' ')
                         for i, word in enumerate(words):
                             chunk = word + (' ' if i < len(words) - 1 else '')
@@ -293,8 +297,14 @@ class AgentSession:
                             stop_sequences=["Thought:", "Action:", "Observation:"],
                         ):
                             final_tokens.append(chunk)
-                            yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
+                        # Strip "Final Answer:" prefix if LLM echoed it back
                         final_answer = "".join(final_tokens).strip()
+                        final_answer = re.sub(r'^Final Answer:\s*', '', final_answer, flags=re.IGNORECASE).strip()
+                        # Now yield word by word
+                        words = final_answer.split(' ')
+                        for i, word in enumerate(words):
+                            chunk = word + (' ' if i < len(words) - 1 else '')
+                            yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
 
                     if not final_answer:
                         final_answer = "Sorry, I could not complete the request within the step limit."

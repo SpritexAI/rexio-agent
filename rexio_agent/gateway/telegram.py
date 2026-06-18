@@ -287,8 +287,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await safe_edit(f"⚠️ {event.get('message', 'Unknown error')}")
                 return
 
-        # Final answer — try Markdown, fallback to plain
+        # Final answer — strip any leaked "Final Answer:" prefix, try Markdown, fallback to plain
+        import re as _re
         final = "".join(answer_chunks).strip()
+        final = _re.sub(r'^Final Answer:\s*', '', final, flags=_re.IGNORECASE).strip()
         if final:
             await safe_edit(final, use_markdown=True)
 
