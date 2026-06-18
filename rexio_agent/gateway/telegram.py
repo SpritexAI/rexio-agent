@@ -45,8 +45,13 @@ def tool_label(tool: str, args: str) -> str:
 
     if tool == "execute_python_code":
         code = parsed.get("code", "")
-        first_line = code.strip().splitlines()[0][:60] if code.strip() else ""
-        return f"⚙️ `{first_line}`" if first_line else "⚙️ Executing code"
+        lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
+        # Skip import/from lines to find the first meaningful line
+        meaningful = next(
+            (l for l in lines if not l.startswith(("import ", "from ", "#"))),
+            lines[0] if lines else ""
+        )
+        return f"⚙️ `{meaningful[:60]}`" if meaningful else "⚙️ Executing code"
 
     if tool == "read_file":
         path = parsed.get("path", "")
