@@ -17,6 +17,7 @@ interface SidebarProps {
   handleCreateSession: () => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  onOpenSkills: () => void;
 }
 
 export default function Sidebar({
@@ -28,6 +29,7 @@ export default function Sidebar({
   handleCreateSession,
   isOpen,
   setIsOpen,
+  onOpenSkills,
 }: SidebarProps) {
   return (
     <div className={`flex flex-col border-r border-white/[0.06] bg-[#1f1f1e] h-full overflow-hidden flex-shrink-0 font-sans select-none transition-all duration-300 ease-in-out ${
@@ -81,7 +83,7 @@ export default function Sidebar({
 
             {/* Customize */}
             <button
-              onClick={() => {}}
+              onClick={onOpenSkills}
               className="w-full bg-transparent border-0 rounded-xl py-2 px-3 flex items-center gap-3 text-[#b4b4b0] hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer text-left font-sans"
             >
               <Briefcase size={16} />
@@ -191,7 +193,7 @@ export default function Sidebar({
 
             {/* Customize Button */}
             <button
-              onClick={() => {}}
+              onClick={onOpenSkills}
               title="Customize"
               className="w-11 h-11 rounded-xl flex items-center justify-center cursor-pointer hover:bg-white/[0.06] transition-all duration-150 border-0 text-[#b4b4b0] hover:text-white bg-transparent"
             >

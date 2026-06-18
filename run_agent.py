@@ -19,6 +19,12 @@ load_environment()
 from rexio_agent.db.connection import (
     init_db,
     get_skills,
+    get_pending_skills,
+    approve_skill,
+    reject_skill,
+    get_markdown_skills,
+    save_markdown_skill,
+    delete_markdown_skill,
     get_messages,
     get_db_connection
 )
@@ -146,12 +152,67 @@ def post_chat_stream(req: ChatRequest):
         },
     )
 
+class MarkdownSkillRequest(BaseModel):
+    name: str
+    description: str
+    content: str
+
+# --- Compiled Skills ---
+
 @app.get("/api/skills")
 def get_agent_skills():
-    """Retrieves all custom dynamic skills learned by the agent."""
     try:
-        skills = get_skills()
-        return {"skills": skills}
+        return {"skills": get_skills()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/skills/pending")
+def get_pending_agent_skills():
+    try:
+        return {"skills": get_pending_skills()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/skills/{name}/approve")
+def approve_agent_skill(name: str):
+    try:
+        approve_skill(name)
+        for session in sessions.values():
+            session.registry.load_custom_skills()
+        return {"status": "approved", "name": name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/skills/{name}/reject")
+def reject_agent_skill(name: str):
+    try:
+        reject_skill(name)
+        return {"status": "rejected", "name": name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Markdown Skills ---
+
+@app.get("/api/markdown-skills")
+def get_md_skills():
+    try:
+        return {"skills": get_markdown_skills()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/markdown-skills")
+def create_md_skill(req: MarkdownSkillRequest):
+    try:
+        save_markdown_skill(req.name, req.description, req.content)
+        return {"status": "saved", "name": req.name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/markdown-skills/{name}")
+def delete_md_skill(name: str):
+    try:
+        delete_markdown_skill(name)
+        return {"status": "deleted", "name": name}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

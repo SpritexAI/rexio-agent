@@ -83,8 +83,8 @@ class SkillCompiler:
             docstring_match = re.search(r'def\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(.*?\)\s*(?:->\s*[^:]+)?\s*:\s*"""(.*?)"""', code, re.DOTALL)
             description = docstring_match.group(1).strip() if docstring_match else f"Custom skill: {skill_name}"
 
-            # Save to Database
-            save_skill(skill_name, description, code)
+            # Save to Database as pending (requires human approval before activation)
+            save_skill(skill_name, description, code, status='pending')
 
             # Save to local file system
             os.makedirs(SKILLS_DIR, exist_ok=True)

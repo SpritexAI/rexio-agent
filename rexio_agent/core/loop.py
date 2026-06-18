@@ -113,10 +113,11 @@ class AgentSession:
         
         # Prepare system instruction
         from datetime import datetime
+        markdown_context = self.registry.get_markdown_context()
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
             tool_definitions=self.registry.get_tool_definitions(),
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
-        )
+        ) + markdown_context
         
         # Start ReAct trace
         trace = history_prompt + "\nAssistant:\n"
@@ -198,10 +199,11 @@ class AgentSession:
         history_prompt += f"User: {user_input}\n"
 
         from datetime import datetime
+        markdown_context = self.registry.get_markdown_context()
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
             tool_definitions=self.registry.get_tool_definitions(),
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
-        )
+        ) + markdown_context
 
         trace = history_prompt + "\nAssistant:\n"
         step = 0

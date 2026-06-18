@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatContainer from './components/ChatContainer';
 import ChatInput from './components/ChatInput';
+import SkillsHub from './components/SkillsHub';
 import { type ExecutionStep } from './components/StepsSummaryModal';
 
 interface Message {
@@ -34,6 +35,7 @@ export default function App() {
     model: '-',
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [showSkillsHub, setShowSkillsHub] = useState<boolean>(false);
   const [thinkingStep, setThinkingStep] = useState<{ thought: string; tool: string; args: string } | null>(null);
   const [activeStepLog, setActiveStepLog] = useState<ExecutionStep[]>([]);
 
@@ -223,7 +225,10 @@ export default function App() {
         handleCreateSession={handleCreateSession}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        onOpenSkills={() => setShowSkillsHub(true)}
       />
+
+      {showSkillsHub && <SkillsHub onClose={() => setShowSkillsHub(false)} />}
 
       <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden">
         <ChatContainer
