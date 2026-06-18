@@ -101,6 +101,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     current_action = ""
 
+    async def keep_typing():
+        try:
+            while True:
+                await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+                await asyncio.sleep(4)
+        except asyncio.CancelledError:
+            pass
+
+    typing_task = asyncio.ensure_future(keep_typing())
+
     try:
         loop = asyncio.get_running_loop()
 
@@ -109,6 +119,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Run generator in thread, collect all events
         events_raw = await loop.run_in_executor(None, run_gen)
+        typing_task.cancel()
 
         # Replay events and update Telegram message progressively
         for raw in events_raw:
@@ -148,6 +159,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await safe_edit(final)
 
     except Exception as e:
+        typing_task.cancel()
         logger.error(f"Error in agent session for chat {chat_id}: {e}")
         await safe_edit(f"⚠️ An error occurred: {str(e)}")
 
