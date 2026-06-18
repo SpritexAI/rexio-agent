@@ -28,14 +28,41 @@ TOOL_LABELS = {
 }
 
 def tool_label(tool: str, args: str) -> str:
-    label = TOOL_LABELS.get(tool, f"🔧 {tool.replace('_', ' ').capitalize()}")
+    import re, ast
+
+    # Try to parse args as a dict for richer labels
+    try:
+        parsed = ast.literal_eval(args) if args else {}
+    except Exception:
+        parsed = {}
+
     if tool == "search_web":
-        import re
-        m = re.search(r"query=['\"](.+?)['\"]", args)
-        q = m.group(1) if m else ""
-        if q:
-            label = f'🔍 Searching "{q}"'
-    return label
+        q = parsed.get("query", "")
+        if not q:
+            m = re.search(r"query=['\"](.+?)['\"]", args)
+            q = m.group(1) if m else ""
+        return f'🔍 Searching "{q}"' if q else "🔍 Searching web"
+
+    if tool == "execute_python_code":
+        code = parsed.get("code", "")
+        first_line = code.strip().splitlines()[0][:60] if code.strip() else ""
+        return f"⚙️ `{first_line}`" if first_line else "⚙️ Executing code"
+
+    if tool == "read_file":
+        path = parsed.get("path", "")
+        name = path.split("/")[-1] if path else ""
+        return f"📄 Reading `{name}`" if name else "📄 Reading file"
+
+    if tool == "write_file":
+        path = parsed.get("path", "")
+        name = path.split("/")[-1] if path else ""
+        return f"✏️ Writing `{name}`" if name else "✏️ Writing file"
+
+    if tool == "list_directory":
+        path = parsed.get("path", "")
+        return f"📁 Listing `{path}`" if path else "📁 Listing directory"
+
+    return TOOL_LABELS.get(tool, f"🔧 {tool.replace('_', ' ').capitalize()}")
 
 
 async def skills_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
