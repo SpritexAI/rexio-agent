@@ -289,25 +289,102 @@ OPENAI_API_KEY={openai_key}
     console.print(f"  [bold]Local Database:[/]   {db_status}")
     console.print("\n[bold green]🎉 Configuration saved successfully to .env![/]\n")
 
-def main():
-    console.print(Panel(Text("Welcome to RexiO Agent ☤\nType 'exit' or 'quit' to end the session.", style="bold cyan", justify="center")))
+def run_update_wizard() -> None:
+    """Updates the RexiO Agent installation by pulling the latest code and syncing package dependencies."""
+    import subprocess
+    import shutil
     
+    console.print()
+    console.print("[bold cyan]┌─────────────────────────────────────────────────────────┐[/]")
+    console.print("[bold cyan]│            ☤ RexiO Agent Update Manager               │[/]")
+    console.print("[bold cyan]├─────────────────────────────────────────────────────────┤[/]")
+    console.print("[bold cyan]│  Checking for updates and updating dependencies...      │[/]")
+    console.print("[bold cyan]│  Press Ctrl+C to abort.                                 │[/]")
+    console.print("[bold cyan]└─────────────────────────────────────────────────────────┘[/]")
+    console.print()
+
+    install_dir = os.path.dirname(os.path.abspath(__file__))
+    git_dir = os.path.join(install_dir, ".git")
+
+    if not os.path.exists(git_dir):
+        console.print("[bold red]✗ Not a git repository.[/] Please update manually or run the installer script:")
+        console.print("  [bold]curl -fsSL https://agent.rexio.pro/install.sh | bash[/]")
+        sys.exit(1)
+
+    console.print("🔄 [yellow]Fetching updates from remote...[/]")
+    try:
+        # Check current commit hash
+        curr_hash_res = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=install_dir, capture_output=True, text=True, check=True)
+        curr_hash = curr_hash_res.stdout.strip()
+        
+        # Git fetch
+        subprocess.run(["git", "fetch", "origin", "main"], cwd=install_dir, check=True, capture_output=True)
+        
+        # Check if remote has new commits
+        status_res = subprocess.run(["git", "rev-list", "HEAD..origin/main", "--count"], cwd=install_dir, capture_output=True, text=True, check=True)
+        new_commits_count = int(status_res.stdout.strip())
+        
+        if new_commits_count == 0:
+            console.print(f"[bold green]✓ Up to date![/] RexiO is already on the latest commit ([cyan]{curr_hash}[/cyan]).")
+        else:
+            console.print(f"📥 [yellow]Found {new_commits_count} new commit(s). Pulling updates...[/]")
+            subprocess.run(["git", "pull", "origin", "main"], cwd=install_dir, check=True)
+            new_hash_res = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=install_dir, capture_output=True, text=True, check=True)
+            new_hash = new_hash_res.stdout.strip()
+            console.print(f"[bold green]✓ Code updated successfully:[/] [cyan]{curr_hash}[/cyan] ➔ [cyan]{new_hash}[/cyan]")
+            
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]✗ Git error during update:[/] {e.stderr.strip() if e.stderr else str(e)}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]✗ Unexpected error during update:[/] {str(e)}")
+        sys.exit(1)
+
+    # Re-install dependencies inside the venv
+    console.print("\n⚡ [yellow]Syncing and updating package dependencies...[/]")
+    
+    # Locate virtualenv python
+    is_windows = sys.platform == "win32"
+    if is_windows:
+        pip_bin = os.path.join(install_dir, ".venv", "Scripts", "pip.exe")
+    else:
+        pip_bin = os.path.join(install_dir, ".venv", "bin", "pip")
+
+    # Locate uv
+    uv_bin = shutil.which("uv")
+
+    try:
+        if uv_bin and os.path.exists(os.path.join(install_dir, ".venv")):
+            console.print("🪄 [cyan]Detected 'uv' package manager. Using fast-installer...[/]")
+            subprocess.run([uv_bin, "pip", "install", "-e", "."], cwd=install_dir, check=True)
+        else:
+            console.print("📦 [cyan]Using standard pip...[/]")
+            if os.path.exists(pip_bin):
+                subprocess.run([pip_bin, "install", "-e", "."], cwd=install_dir, check=True)
+            else:
+                subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=install_dir, check=True)
+                
+        console.print("[bold green]✓ Dependencies re-installed and compiled successfully.[/]")
+        console.print("\n[bold green]🎉 RexiO Agent update complete![/]\n")
+    except subprocess.CalledProcessError as e:
+        console.print("[bold red]✗ Failed to compile and install package dependencies.[/]")
+        sys.exit(1)
+
+def main():
+    # 1. Check for update request
+    if len(sys.argv) > 1 and sys.argv[1] in ("update", "--update"):
+        try:
+            run_update_wizard()
+            sys.exit(0)
+        except KeyboardInterrupt:
+            console.print("\n[bold yellow]Update cancelled.[/]")
+            sys.exit(1)
+
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     
     # Run setup wizard if configuration does not exist, if explicitly requested via 'setup' / '--setup', or if keys are empty
     should_run_setup = not os.path.exists(env_path) or (len(sys.argv) > 1 and sys.argv[1] in ("setup", "--setup"))
     
-    if not should_run_setup and os.path.exists(env_path):
-        load_dotenv(env_path, override=True)
-        provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
-        gemini_key = os.getenv("GEMINI_API_KEY", "")
-        openai_key = os.getenv("OPENAI_API_KEY", "")
-        
-        if (provider == "gemini" and not gemini_key) or (provider == "openai" and not openai_key):
-            console.print("[yellow]Warning:[/] Configuration credentials appear to be missing.")
-            if select_option("Would you like to run the setup wizard now?", ["yes", "no"], default_idx=0) == "yes":
-                should_run_setup = True
-
     if should_run_setup:
         try:
             run_setup_wizard(env_path)
@@ -319,6 +396,22 @@ def main():
         except KeyboardInterrupt:
             console.print("\n[bold yellow]Setup cancelled.[/]")
             sys.exit(1)
+
+    if not should_run_setup and os.path.exists(env_path):
+        load_dotenv(env_path, override=True)
+        provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        openai_key = os.getenv("OPENAI_API_KEY", "")
+        
+        if (provider == "gemini" and not gemini_key) or (provider == "openai" and not openai_key):
+            console.print("[yellow]Warning:[/] Configuration credentials appear to be missing.")
+            if select_option("Would you like to run the setup wizard now?", ["yes", "no"], default_idx=0) == "yes":
+                try:
+                    run_setup_wizard(env_path)
+                    load_dotenv(env_path, override=True)
+                except KeyboardInterrupt:
+                    console.print("\n[bold yellow]Setup cancelled.[/]")
+                    sys.exit(1)
             
     # 2. Initialize database
     try:
@@ -336,6 +429,8 @@ def main():
         sys.exit(1)
         
     console.print("[bold green]Agent initialized and ready.[/]\n")
+    
+    console.print(Panel(Text("Welcome to RexiO Agent ☤\nType 'exit' or 'quit' to end the session.", style="bold cyan", justify="center")))
     
     # 4. Interactive chat loop
     while True:
