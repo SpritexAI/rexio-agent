@@ -24,6 +24,9 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
     sys.stdout.write("  \033[2m↑↓ navigate  ENTER/SPACE select  Ctrl+C exit\033[0m\n\n")
     sys.stdout.flush()
     current_idx = default_idx
+    visible_limit = 10
+    scroll_offset = 0
+    last_rendered_lines = 0
     
     # Hide cursor
     sys.stdout.write("\033[?25l")
@@ -31,18 +34,47 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
     
     try:
         while True:
-            # Print choices
-            for i, choice in enumerate(choices):
-                if i == current_idx:
+            # 1. Clear previous render (if any) to redraw in place
+            if last_rendered_lines > 0:
+                for _ in range(last_rendered_lines):
+                    sys.stdout.write("\033[K\n")
+                sys.stdout.write(f"\033[{last_rendered_lines}A")
+                sys.stdout.flush()
+                
+            # 2. Compute viewport offsets to keep the selection centered/in view
+            if current_idx < scroll_offset:
+                scroll_offset = current_idx
+            elif current_idx >= scroll_offset + visible_limit:
+                scroll_offset = current_idx - visible_limit + 1
+            scroll_offset = max(0, min(scroll_offset, max(0, len(choices) - visible_limit)))
+            
+            rendered_choices = choices[scroll_offset : scroll_offset + visible_limit]
+            
+            # 3. Print current choices with pagination indicators if necessary
+            rendered_lines = 0
+            if scroll_offset > 0:
+                sys.stdout.write("     \033[2m▲ ...\033[0m\n")
+                rendered_lines += 1
+                
+            for i, choice in enumerate(rendered_choices):
+                actual_idx = scroll_offset + i
+                if actual_idx == current_idx:
                     # Selected: Green arrow ➔, filled circle (●), and bold green text
                     sys.stdout.write(f"\033[1;32m➔ (●) {choice}\033[0m\n")
                 else:
                     # Unselected: empty circle (o) and normal text
                     sys.stdout.write(f"   (o) {choice}\n")
-                    
-            # Move cursor back to the top of the choices list
-            sys.stdout.write(f"\033[{len(choices)}A")
+                rendered_lines += 1
+                
+            if scroll_offset + visible_limit < len(choices):
+                sys.stdout.write("     \033[2m▼ ...\033[0m\n")
+                rendered_lines += 1
+                
+            # Move cursor back to the top of the choices list for drawing
+            sys.stdout.write(f"\033[{rendered_lines}A")
             sys.stdout.flush()
+            
+            last_rendered_lines = rendered_lines
             
             # Read character
             fd = sys.stdin.fileno()
@@ -64,18 +96,14 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
                 
-            # Clear lines for redraw
-            for _ in range(len(choices)):
-                sys.stdout.write("\033[K\n")
-            sys.stdout.write(f"\033[{len(choices)}A")
-            sys.stdout.flush()
-            
     finally:
-        # Show cursor and clean options
-        for _ in range(len(choices)):
-            sys.stdout.write("\033[K\n")
-        # Move up to prompt header (header has 3 lines: prompt_text, guide, empty line)
-        sys.stdout.write(f"\033[{len(choices) + 3}A")
+        # Show cursor and clean options from terminal scrollback
+        if last_rendered_lines > 0:
+            for _ in range(last_rendered_lines):
+                sys.stdout.write("\033[K\n")
+            sys.stdout.write(f"\033[{last_rendered_lines + 3}A")
+        else:
+            sys.stdout.write("\033[3A")
         sys.stdout.write("\033[K\n\033[K\n\033[K")
         sys.stdout.write("\033[2A") # Move back to the first line
         sys.stdout.write("\033[?25h")
@@ -85,6 +113,95 @@ def select_option(prompt_text: str, choices: list, default_idx: int = 0) -> str:
     clean_choice = choices[current_idx].split("  ←")[0]
     print(f"\033[1;33mSelect {prompt_text.replace('Select ', '')}:\033[0m \033[1;32m{clean_choice}\033[0m\n")
     return choices[current_idx]
+
+def fetch_provider_models(provider: str, api_key: str, api_base_url: str = "") -> list[str]:
+    """Fetch model names from the provider using the specified API key.
+    Returns a list of model display choices, or an empty list if fetching fails.
+    """
+    import urllib.request
+    import json
+    
+    timeout = 4.0
+    
+    try:
+        if provider == "gemini":
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+            req = urllib.request.Request(url)
+            req.add_header("Accept", "application/json")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+            models = []
+            for m in data.get("models", []):
+                name = m.get("name", "")
+                if name.startswith("models/"):
+                    name = name[len("models/"):]
+                methods = m.get("supportedGenerationMethods", [])
+                if "generateContent" in methods:
+                    models.append(name)
+            gemini_models = [m for m in models if m.startswith("gemini")]
+            gemini_models.sort(reverse=True)
+            return gemini_models
+            
+        elif provider == "openai":
+            base_url = api_base_url or "https://api.openai.com/v1"
+            url = f"{base_url.rstrip('/')}/models"
+            req = urllib.request.Request(url)
+            req.add_header("Authorization", f"Bearer {api_key}")
+            req.add_header("Accept", "application/json")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+            models = []
+            for m in data.get("data", []):
+                mid = m.get("id", "")
+                if any(term in mid for term in ("embed", "whisper", "dall-e", "tts", "moderation", "babbage", "davinci", "similarity")):
+                    continue
+                if "gpt" in mid or "o1" in mid or "o3" in mid:
+                    models.append(mid)
+            models.sort()
+            return models
+            
+        elif provider == "openrouter":
+            url = "https://openrouter.ai/api/v1/models"
+            req = urllib.request.Request(url)
+            if api_key:
+                req.add_header("Authorization", f"Bearer {api_key}")
+            req.add_header("Accept", "application/json")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+            models = []
+            for m in data.get("data", []):
+                mid = m.get("id", "")
+                name = m.get("name", "")
+                if mid:
+                    if name:
+                        models.append(f"{mid}  ({name})")
+                    else:
+                        models.append(mid)
+            models.sort()
+            return models
+            
+        elif provider == "custom":
+            if not api_base_url:
+                return []
+            url = f"{api_base_url.rstrip('/')}/models"
+            req = urllib.request.Request(url)
+            if api_key:
+                req.add_header("Authorization", f"Bearer {api_key}")
+            req.add_header("Accept", "application/json")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+            models = []
+            for m in data.get("data", []):
+                mid = m.get("id", "")
+                if mid:
+                    models.append(mid)
+            models.sort()
+            return models
+            
+    except Exception:
+        pass
+        
+    return []
 
 def run_setup_wizard(config_path: str) -> None:
     """Runs an interactive CLI setup wizard to configure the API keys and models."""
@@ -163,64 +280,7 @@ def run_setup_wizard(config_path: str) -> None:
     selected_idx = display_choices.index(selected_display)
     provider = provider_choices[selected_idx]
     
-    # 3. Model Name Selection
-    model_choices = {
-        "gemini": [
-            "gemini-2.5-flash  (Fast, default model)",
-            "gemini-2.5-pro  (Highly capable, reasoning model)",
-            "gemini-1.5-flash  (Older generation flash)",
-            "gemini-1.5-pro  (Older generation pro)"
-        ],
-        "openai": [
-            "gpt-4o  (High-speed, premium multi-modal)",
-            "gpt-4o-mini  (Cost-efficient, fast model)",
-            "o1  (Advanced reasoning model)",
-            "o1-mini  (Fast reasoning model)"
-        ],
-        "openrouter": [
-            "google/gemini-2.5-flash  (Recommended flash)",
-            "google/gemini-2.5-pro  (Recommended pro)",
-            "openai/gpt-4o  (GPT-4o on OpenRouter)",
-            "anthropic/claude-3.5-sonnet  (Claude 3.5 Sonnet)"
-        ],
-        "custom": [
-            "llama3  (Meta Llama 3)",
-            "qwen2.5-coder  (Qwen 2.5 Coder)",
-            "mistral  (Mistral 7B)",
-            "phi3  (Microsoft Phi 3)"
-        ]
-    }
-
-    choices = model_choices.get(provider, []).copy()
-    manual_option = "Enter model name manually..."
-    choices.append(manual_option)
-    
-    default_model_idx = 0
-    if current_model:
-        found_match = False
-        for i, choice in enumerate(choices):
-            # Split by double space to extract raw model name
-            choice_clean = choice.split("  ")[0].strip()
-            if choice_clean == current_model:
-                choices[i] = f"{choice_clean}  ← currently active"
-                default_model_idx = i
-                found_match = True
-                break
-        if not found_match:
-            choices.insert(0, f"{current_model}  ← currently active")
-            default_model_idx = 0
-            
-    selected_model_display = select_option("Select Model", choices, default_idx=default_model_idx)
-    
-    if selected_model_display == manual_option:
-        model_name = Prompt.ask("Enter Model Name").strip()
-        while not model_name:
-            model_name = Prompt.ask("Model Name cannot be empty. Please enter name").strip()
-    else:
-        # Parse the raw model identifier
-        model_name = selected_model_display.split("  ")[0].strip()
-    
-    # 4. API Credentials Configuration
+    # 3. API Credentials Configuration (Moved to Step 3, before Model Selection)
     gemini_key = ""
     openai_key = ""
     api_base_url = ""
@@ -265,9 +325,104 @@ def run_setup_wizard(config_path: str) -> None:
                 openai_key = Prompt.ask("OpenRouter API Key cannot be empty. Please enter key", password=True)
         api_base_url = "https://openrouter.ai/api/v1"
         
-    else:
+    else: # custom
         openai_key = Prompt.ask("Enter your API Key (e.g. Ollama API key)", default=current_openai_key)
         api_base_url = Prompt.ask("Enter custom API Base URL (e.g. http://localhost:11434/v1)", default=current_api_base or "http://localhost:11434/v1")
+
+    # Fetch available models using the configured API credentials
+    fetched = []
+    with console.status(f"[bold cyan]Fetching available models for {provider}...[/]"):
+        if provider == "gemini":
+            fetched = fetch_provider_models("gemini", gemini_key)
+        elif provider == "openai":
+            fetched = fetch_provider_models("openai", openai_key, api_base_url)
+        elif provider == "openrouter":
+            fetched = fetch_provider_models("openrouter", openai_key)
+        elif provider == "custom":
+            fetched = fetch_provider_models("custom", openai_key, api_base_url)
+            
+    if fetched:
+        console.print(f"  [bold green]✓[/] Successfully fetched {len(fetched)} models from provider API.\n")
+    else:
+        console.print("  [bold yellow]⚠[/] Could not fetch models from API (offline or invalid key). Using default list.\n")
+
+    # 4. Model Name Selection
+    model_choices = {
+        "gemini": [
+            "gemini-2.5-flash  (Fast, default model)",
+            "gemini-2.5-pro  (Highly capable, reasoning model)",
+            "gemini-1.5-flash  (Older generation flash)",
+            "gemini-1.5-pro  (Older generation pro)"
+        ],
+        "openai": [
+            "gpt-4o  (High-speed, premium multi-modal)",
+            "gpt-4o-mini  (Cost-efficient, fast model)",
+            "o1  (Advanced reasoning model)",
+            "o1-mini  (Fast reasoning model)"
+        ],
+        "openrouter": [
+            "google/gemini-2.5-flash  (Recommended flash)",
+            "google/gemini-2.5-pro  (Recommended pro)",
+            "openai/gpt-4o  (GPT-4o on OpenRouter)",
+            "anthropic/claude-3.5-sonnet  (Claude 3.5 Sonnet)"
+        ],
+        "custom": [
+            "llama3  (Meta Llama 3)",
+            "qwen2.5-coder  (Qwen 2.5 Coder)",
+            "mistral  (Mistral 7B)",
+            "phi3  (Microsoft Phi 3)"
+        ]
+    }
+
+    default_choices = model_choices.get(provider, [])
+    choices = []
+    if fetched:
+        desc_map = {}
+        for choice in default_choices:
+            parts = choice.split("  ")
+            clean_id = parts[0].strip()
+            if len(parts) > 1:
+                desc_map[clean_id] = parts[1].strip()
+                
+        for m in fetched:
+            if "  " in m:
+                choices.append(m)
+            else:
+                desc = desc_map.get(m, "")
+                if desc:
+                    choices.append(f"{m}  {desc}")
+                else:
+                    choices.append(m)
+    else:
+        choices = default_choices.copy()
+        
+    manual_option = "Enter model name manually..."
+    choices.append(manual_option)
+    
+    default_model_idx = 0
+    if current_model:
+        found_match = False
+        for i, choice in enumerate(choices):
+            # Split by double space to extract raw model name
+            choice_clean = choice.split("  ")[0].strip()
+            if choice_clean == current_model:
+                choices[i] = f"{choice_clean}  ← currently active"
+                default_model_idx = i
+                found_match = True
+                break
+        if not found_match:
+            choices.insert(0, f"{current_model}  ← currently active")
+            default_model_idx = 0
+            
+    selected_model_display = select_option("Select Model", choices, default_idx=default_model_idx)
+    
+    if selected_model_display == manual_option:
+        model_name = Prompt.ask("Enter Model Name").strip()
+        while not model_name:
+            model_name = Prompt.ask("Model Name cannot be empty. Please enter name").strip()
+    else:
+        # Parse the raw model identifier
+        model_name = selected_model_display.split("  ")[0].strip()
 
     # 5. Telegram Gateway Integration
     telegram_token = ""
