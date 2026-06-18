@@ -222,9 +222,9 @@ if os.path.exists(web_dist_path):
     app.mount("/", StaticFiles(directory=web_dist_path, html=True), name="static")
 
 def start():
-    # Load configuration
     port = int(os.getenv("PORT", 51730))
-    uvicorn.run("run_agent:app", host="0.0.0.0", port=port, reload=True)
+    dev = os.getenv("REXIO_DEV", "1") == "1"
+    uvicorn.run("run_agent:app", host="0.0.0.0", port=port, reload=dev)
 
 if __name__ == "__main__":
     start()

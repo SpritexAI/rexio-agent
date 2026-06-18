@@ -10,6 +10,7 @@ from rich.text import Text
 
 from rexio_agent.core.llm import LlmClient
 from rexio_agent.tools.registry import ToolRegistry
+from rexio_agent.core.memory_store import MemoryStore
 from rexio_agent.db.connection import save_conversation, save_message, update_message_steps, get_messages
 
 SOUL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SOUL.md")
@@ -91,7 +92,12 @@ class AgentSession:
         self.platform = platform
         self.channel_id = channel_id
         self.conversation_id = conversation_id or str(uuid.uuid4())
-        
+
+        # Load memory store and wire into registry
+        self.memory = MemoryStore()
+        self.memory.load()
+        self.registry.memory_store = self.memory
+
         # Save new conversation to DB
         save_conversation(self.conversation_id, self.platform, self.channel_id)
         
@@ -132,10 +138,11 @@ class AgentSession:
         from datetime import datetime
         soul = load_soul()
         markdown_context = self.registry.get_markdown_context()
+        memory_block = self.memory.system_prompt_block()
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
             tool_definitions=self.registry.get_tool_definitions(),
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
-        ) + (f"\n\n## Persona\n{soul}" if soul else "") + markdown_context
+        ) + (f"\n\n## Persona\n{soul}" if soul else "") + (f"\n\n{memory_block}" if memory_block else "") + markdown_context
         
         # Start ReAct trace
         trace = history_prompt + "\nAssistant:\n"
@@ -219,10 +226,11 @@ class AgentSession:
         from datetime import datetime
         soul = load_soul()
         markdown_context = self.registry.get_markdown_context()
+        memory_block = self.memory.system_prompt_block()
         system_instruction = SYSTEM_INSTRUCTION_TEMPLATE.format(
             tool_definitions=self.registry.get_tool_definitions(),
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M")
-        ) + (f"\n\n## Persona\n{soul}" if soul else "") + markdown_context
+        ) + (f"\n\n## Persona\n{soul}" if soul else "") + (f"\n\n{memory_block}" if memory_block else "") + markdown_context
 
         trace = history_prompt + "\nAssistant:\n"
         step = 0

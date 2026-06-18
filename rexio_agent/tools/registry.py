@@ -17,6 +17,7 @@ BUILTIN_TOOLS: Dict[str, Callable] = {
 class ToolRegistry:
     def __init__(self):
         self.tools: Dict[str, Callable] = dict(BUILTIN_TOOLS)
+        self.memory_store = None  # set by AgentSession after load()
         self.load_custom_skills()
         
     def get_markdown_context(self) -> str:
@@ -52,37 +53,60 @@ class ToolRegistry:
             pass
 
     def get_tool_definitions(self) -> str:
-        """Generates a text description of all available tools, their signatures, and docstrings."""
+        """Generates a text description of all available tools."""
+        from rexio_agent.core.memory_store import MEMORY_TOOL_SCHEMA
         definitions = []
         for name, func in self.tools.items():
             sig = inspect.signature(func)
             doc = func.__doc__.strip() if func.__doc__ else "No description available."
-            # Clean up indentation in docstring
             doc_cleaned = "\n".join([line.strip() for line in doc.split("\n")])
             definitions.append(f"- {name}{sig}:\n  Description: {doc_cleaned}\n")
-            
-        # Add the special self-improvement tool description
+
         definitions.append(
             "- save_recent_workflow_as_tool(task_description: str):\n"
             "  Description: Saves the sequence of steps taken in the current session as a reusable tool.\n"
             "  Call this when you have successfully completed a multi-step task and want to memorize the workflow.\n"
         )
+        definitions.append(MEMORY_TOOL_SCHEMA)
         return "\n".join(definitions)
 
     def execute(self, name: str, kwargs: Dict[str, Any], execution_log: Optional[List[Dict[str, Any]]] = None) -> str:
         """Executes a tool by name with keyword arguments."""
         if name == "save_recent_workflow_as_tool":
             return self._save_recent_workflow(kwargs.get("task_description", ""), execution_log)
-            
+
+        if name == "memory":
+            return self._execute_memory(kwargs)
+
         if name not in self.tools:
             return f"Error: Tool '{name}' is not registered."
-        
+
         try:
             func = self.tools[name]
             result = func(**kwargs)
             return str(result)
         except Exception as e:
             return f"Error executing tool '{name}': {str(e)}"
+
+    def _execute_memory(self, kwargs: Dict[str, Any]) -> str:
+        import json as _json
+        if self.memory_store is None:
+            return "Error: Memory store not initialized."
+        action = kwargs.get("action", "")
+        target = kwargs.get("target", "memory")
+        content = kwargs.get("content")
+        old_text = kwargs.get("old_text")
+        if target not in ("memory", "user"):
+            return _json.dumps({"success": False, "error": f"Invalid target '{target}'. Use 'memory' or 'user'."})
+        if action == "add":
+            result = self.memory_store.add(target, content or "")
+        elif action == "replace":
+            result = self.memory_store.replace(target, old_text or "", content or "")
+        elif action == "remove":
+            result = self.memory_store.remove(target, old_text or "")
+        else:
+            result = {"success": False, "error": f"Unknown action '{action}'. Use: add, replace, remove"}
+        return _json.dumps(result, ensure_ascii=False)
 
     def _save_recent_workflow(self, task_description: str, execution_log: Optional[List[Dict[str, Any]]]) -> str:
         if not execution_log:
