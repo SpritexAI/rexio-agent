@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
 # Load env variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 class LlmClient:
     """Wrapper class to communicate with Gemini, OpenAI, or local models."""

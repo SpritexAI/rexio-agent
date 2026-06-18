@@ -166,7 +166,7 @@ def main():
     should_run_setup = not os.path.exists(env_path) or (len(sys.argv) > 1 and sys.argv[1] == "--setup")
     
     if not should_run_setup and os.path.exists(env_path):
-        load_dotenv(env_path)
+        load_dotenv(env_path, override=True)
         provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
         gemini_key = os.getenv("GEMINI_API_KEY", "")
         openai_key = os.getenv("OPENAI_API_KEY", "")
