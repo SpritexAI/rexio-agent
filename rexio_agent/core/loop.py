@@ -211,20 +211,31 @@ class AgentSession:
                     yield f"data: {json.dumps(step_event)}\n\n"
                     trace += f"\nObservation: {observation}\n"
                 else:
-                    # No more tool calls — stream the final answer token-by-token.
-                    # Build a prompt that ends right before the answer text so the
-                    # model continues from that point in a fresh streaming call.
-                    answer_prompt = trace.rstrip() + "\nFinal Answer:"
+                    # No more tool calls — extract or stream the final answer.
+                    final_match = re.search(r'Final Answer:\s*(.*)', response_text, re.DOTALL)
 
-                    final_tokens: List[str] = []
-                    for chunk in self.llm.generate_stream(
-                        system_instruction=system_instruction,
-                        prompt=answer_prompt,
-                    ):
-                        final_tokens.append(chunk)
-                        yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
+                    if final_match:
+                        # Model already produced the full answer — stream it word-by-word
+                        # without a second LLM call to avoid re-running the ReAct loop.
+                        final_answer = final_match.group(1).strip()
+                        words = final_answer.split(' ')
+                        for i, word in enumerate(words):
+                            chunk = word + (' ' if i < len(words) - 1 else '')
+                            yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
+                    else:
+                        # Model stopped mid-generation — ask it to continue, strictly
+                        # as plain answer text with no ReAct formatting.
+                        answer_prompt = trace.rstrip() + "\nFinal Answer:"
+                        final_tokens: List[str] = []
+                        for chunk in self.llm.generate_stream(
+                            system_instruction=system_instruction,
+                            prompt=answer_prompt,
+                            stop_sequences=["Thought:", "Action:", "Observation:"],
+                        ):
+                            final_tokens.append(chunk)
+                            yield f"data: {json.dumps({'type': 'token', 'text': chunk})}\n\n"
+                        final_answer = "".join(final_tokens).strip()
 
-                    final_answer = "".join(final_tokens).strip()
                     if not final_answer:
                         final_answer = "Sorry, I could not complete the request within the step limit."
                         yield f"data: {json.dumps({'type': 'token', 'text': final_answer})}\n\n"
@@ -232,6 +243,7 @@ class AgentSession:
                     save_message(self.conversation_id, "assistant", final_answer)
                     yield f"data: {json.dumps({'type': 'done', 'conversation_id': self.conversation_id, 'execution_log': self.execution_log})}\n\n"
                     return
+
 
             # Exhausted max steps without a final answer
             fallback = "Sorry, I could not complete the request within the step limit."
