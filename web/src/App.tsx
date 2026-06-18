@@ -38,7 +38,9 @@ interface ExecutionStep {
   observation: string;
 }
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = window.location.port === '5173' 
+  ? 'http://localhost:8000' 
+  : window.location.origin;
 
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
